@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# 브랜치명에서 OKA-[숫자] 패턴 추출
+COMMIT_MSG_FILE=$1
+BRANCH_NAME=$(git symbolic-ref --short HEAD 2>/dev/null)
+JIRA_ID=$(echo "$BRANCH_NAME" | grep -oE "OKA-[0-9]+")
+
+if [ -n "$JIRA_ID" ]; then
+    FIRST_LINE=$(head -n 1 "$COMMIT_MSG_FILE")
+    # 메시지에 이미 이슈 키가 없는 경우에만 추가
+    if [[ ! "$FIRST_LINE" == *"$JIRA_ID"* ]]; then
+        sed -i "" "1s/$/ - $JIRA_ID/" "$COMMIT_MSG_FILE"
+    fi
+fi
