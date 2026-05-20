@@ -1,3 +1,11 @@
+from sqlalchemy import Column, String, Integer, Text, DateTime
+from sqlalchemy.sql import func
+
+from app.core.config.database import Base
+from app.core.utils.tsid import TSID
+
+
+
 class AiReport(Base):
     __tablename__ = "ai_report"
 

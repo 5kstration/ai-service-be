@@ -16,15 +16,17 @@ class TSID:
 
     @classmethod
     def create(cls) -> str:
-        # race condition 방지 위해 lock 사용
+        # race
         with cls._lock:
             ts = int(time.time() * 1000)
             if ts == cls.last_time:
                 cls.counter += 1
                 if cls.counter >= (1 << cls.COUNTER_BITS):  # 4096 초과 방지
-                    time.sleep(0.001)
-                    ts = int(time.time() * 1000)
+                    while ts <= cls.last_time:
+                        time.sleep(0.0001)
+                        ts = int(time.time() * 1000)
                     cls.counter = 0
+                    cls.last_time = ts
             else:
                 cls.counter = 0
                 cls.last_time = ts

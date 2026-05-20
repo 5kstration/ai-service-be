@@ -54,7 +54,7 @@
 
 ## 📁 프로젝트 구조 (Project Structure)
 
-```
+```text
 app/
 ├── core/
 │   ├── config/
