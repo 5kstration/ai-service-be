@@ -1,5 +1,5 @@
 # app/domain/report/entity.py
-from sqlalchemy import Column, String, Integer, BigInteger, Text, DateTime, Date, Numeric
+from sqlalchemy import Column, String, Integer, Text, DateTime, Date, Numeric
 from sqlalchemy.sql import func
 from app.core.config.database import Base
 from app.core.utils.tsid import TSID
@@ -29,7 +29,7 @@ class MonthlySummary(Base):
     year       = Column(Integer,        nullable=False)
     month      = Column(Integer,        nullable=False)
     category   = Column(String(100))
-    amount     = Column(BigInteger)
+    amount     = Column(Integer)
     ratio      = Column(Numeric(5, 2))
     created_at = Column(DateTime,       nullable=False, server_default=func.now())
 
@@ -42,7 +42,7 @@ class WeeklyExpense(Base):
     year       = Column(Integer,    nullable=False)
     month      = Column(Integer,    nullable=False)
     week       = Column(Integer,    nullable=False)
-    amount     = Column(BigInteger,  default=0)
+    amount     = Column(Integer,  default=0)
     start_date = Column(Date)
     end_date   = Column(Date)
     created_at = Column(DateTime,   nullable=False, server_default=func.now())

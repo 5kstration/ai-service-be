@@ -1,6 +1,6 @@
 # app/domain/insight/entity.py
 import enum
-from sqlalchemy import Column, String, Integer, BigInteger, Text, DateTime, Enum
+from sqlalchemy import Column, String, Integer, Text, DateTime, Enum
 from sqlalchemy.sql import func
 from app.core.config.database import Base
 from app.core.utils.tsid import TSID
@@ -25,8 +25,8 @@ class AiInsight(Base):
     insight_title    = Column(String(255) )
     description      = Column(Text        )
     target_id        = Column(String(26)  )
-    total_expense    = Column(BigInteger  )
-    goal_expense     = Column(BigInteger  )
+    total_expense    = Column(Integer  )
+    goal_expense     = Column(Integer  )
     achievement_rate = Column(Integer     )
     remain_budge     = Column(Integer     )
     remain_days      = Column(Integer     )

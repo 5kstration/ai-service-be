@@ -19,6 +19,10 @@ class TSID:
         # race
         with cls._lock:
             ts = int(time.time() * 1000)
+            if ts < cls.last_time:
+                while ts < cls.last_time:
+                    time.sleep(0.0001)
+                    ts = int(time.time() * 1000)
             if ts == cls.last_time:
                 cls.counter += 1
                 if cls.counter >= (1 << cls.COUNTER_BITS):  # 4096 초과 방지
