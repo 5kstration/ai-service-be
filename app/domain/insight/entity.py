@@ -19,10 +19,7 @@ class AiInsight(Base):
 
     insight_id   = Column(String(26), primary_key=True, default=TSID.create)
     user_id      = Column(String(26), nullable=False)
-    insight_type = Column(
-        Enum(InsightType, name="insight_type_enum"),
-        nullable=False
-    )
+    insight_type = Column(Enum(InsightType, name="insight_type_enum"),nullable=False)
     title        = Column(String(255))
     description  = Column(Text)
     icon_type    = Column(String(50))
