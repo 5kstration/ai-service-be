@@ -1,93 +1,138 @@
-# ai-service-BE
+프로젝트 파일들 참고해서 작성해줄게.
 
+---
 
-#수정
-## Getting started
+# AI Service (청년 맞춤형 금융 생활 관리 플랫폼)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 📌 개요 (Executive Summary)
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+수집된 사용자 소비 데이터를 분석하여 월별 리포트, 또래 비교, 맞춤형 금융 상품 및 청년 정책 추천을 제공하는 AI 특화 마이크로서비스입니다.
 
-## Add your files
+딱딱한 숫자 나열을 넘어 AI가 분석한 소비 패턴을 친근한 자연어로 전달하고, 사용자 조건에 맞는 혜택 정보를 자동으로 큐레이션하여 청년 세대의 능동적인 금융 생활을 지원합니다.
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+### 핵심 가치 (Core Values)
 
-```
-cd existing_repo
-git remote add origin https://gitlab.com/5kstration/ai-service-be.git
-git branch -M main
-git push -uf origin main
-```
+- **AI 월별 소비 리포트**: 카테고리별 지출 비율, 전월 대비 증감, 낭비성 지출 경고를 포함한 자연어 리포트 자동 생성
+- **또래 비교 분석**: 유사한 연령대·소득 수준 그룹의 평균 소비 데이터와 비교한 긍정적 응원 메시지 제공
+- **비식별화 파이프라인**: 민감한 금융 데이터를 LLM 호출 전 마스킹·익명화 처리하여 개인정보 보호
+- **비동기 리포트 생성**: LLM 호출을 비동기로 처리하고 완료 시 푸시 알림 발송
 
-## Integrate with your tools
+---
 
-* [Set up project integrations](https://gitlab.com/5kstration/ai-service-be/-/settings/integrations)
+## 🛠️ 기술 스택 (Technology Stack)
 
-## Collaborate with your team
+### Backend Core
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+- **Language**: Python 3.9
+- **Framework**: FastAPI 0.115.0
+- **ASGI Server**: Uvicorn 0.30.0
 
-## Test and Deploy
+### Infrastructure & Databases
 
-Use the built-in continuous integration in GitLab.
+- **Main DB**: PostgreSQL 16 (AI 인사이트, 추천 결과 저장)
+- **ORM**: SQLAlchemy 2.0.36
+- **Message Broker**: NATS JetStream (비동기 이벤트 구동 처리)
+- **LLM API**: Anthropic Claude API (anthropic 0.34.0)
+- **HTTP Client**: httpx 0.27.0 (내부 서비스 간 통신)
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### Architecture & Patterns
 
-***
+- **Layered Architecture**: MVC 계층 분리 (router → service → repository). Entity의 프리젠테이션 계층 노출 금지
+- **Communication**: 동기 호출 시 httpx + 서킷 브레이커 패턴 적용. 비동기 이벤트 통신에는 NATS JetStream 활용
+- **Standard Responses**: 모든 API 응답은 `CommonResponse[T]` Pydantic 모델로 일관되게 래핑
+- **Data Transfer Objects**: Pydantic BaseModel을 활용한 요청/응답 스키마 분리
+- **비식별화**: LLM 호출 전 userId SHA-256 해싱, 가맹점명 카테고리 대체, 금액 반올림 처리
 
-# Editing this README
+---
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## 📡 API 명세 요약 (AI API Endpoints)
 
-## Suggestions for a good README
+| Domain | Method | Endpoint | Description |
+|--------|--------|----------|-------------|
+| Report | GET | /api/ai/report/monthly | AI 월간 소비 리포트 조회 |
+| Report | POST | /api/ai/report/monthly | AI 월간 소비 리포트 생성 요청 |
+| Report | GET | /api/ai/report/weekly-expense | 주간 지출 데이터 조회 |
+| Report | GET | /api/ai/report/peers-comparison | 또래 비교 데이터 조회 |
+| Insight | GET | /api/ai/insights | AI 인사이트 목록 조회 |
+| Internal | POST | /api/internal/report/generate | 리포트 생성 요청 (내부 서비스 전용) |
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+---
 
-## Name
-Choose a self-explaining name for your project.
+## 📖 Reference Documentation
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+- [FastAPI 공식 문서](https://fastapi.tiangolo.com)
+- [SQLAlchemy 2.0 공식 문서](https://docs.sqlalchemy.org/en/20/)
+- [Anthropic Claude API 문서](https://docs.anthropic.com)
+- [NATS Python Client 문서](https://github.com/nats-io/nats.py)
+- [Pydantic v2 공식 문서](https://docs.pydantic.dev/latest/)
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+---
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+---
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+# Recommend Service (청년 맞춤형 금융 생활 관리 플랫폼)
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+## 📌 개요 (Executive Summary)
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+사용자의 소비 패턴과 온보딩 정보를 분석하여 최적의 카드·보험 상품과 청년 정책을 추천하는 추천 특화 마이크로서비스입니다.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+파편화된 청년 금융·복지 정보를 한곳에서 접할 수 있도록 공공데이터 포털 API, 금융감독원 API, 보험다모아 크롤링 데이터를 통합하여 사용자 조건에 맞는 정보를 자동으로 큐레이션합니다.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### 핵심 가치 (Core Values)
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+- **소비 패턴 기반 카드 추천**: 최근 3개월 소비 카테고리 TOP3 분석으로 최적 혜택 카드 제안
+- **라이프스타일 맞춤 보험 추천**: 인구통계 정보와 특수 소비 내역(반려용품 → 펫보험 등) 트리거 매칭
+- **청년 정책 AI 추천**: 온보딩 정보 기반 조건 필터링 + Graph RAG 구조로 정책 간 충돌·연계 관계 탐색
+- **북마크 및 알림**: 관심 정책·상품 북마크 시 마감 D-7, D-1 알림 자동 예약
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+---
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## 🛠️ 기술 스택 (Technology Stack)
 
-## License
-For open source projects, say how it is licensed.
+### Backend Core
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+- **Language**: Java 17 (LTS)
+- **Framework**: Spring Boot 3.5.14
+- **Build Tool**: Gradle (Gradle Wrapper)
+
+### Infrastructure & Databases
+
+- **Main DB**: PostgreSQL 16 (추천 결과, 북마크, 청년정책 데이터 저장)
+- **Cache**: Redis 7.x (추천 결과 캐싱, Rate Limiting)
+- **Message Broker**: NATS JetStream (비동기 이벤트 구동 처리)
+- **Search Engine**: Elasticsearch (정책 키워드 전문 검색)
+- **Container & Orchestration**: Docker, Kubernetes (Amazon EKS)
+- **CI/CD**: GitLab CI/CD, Jenkins, AWS ECR
+
+### Architecture & Patterns
+
+- **Layered Architecture**: 철저한 MVC 계층 분리 (Controller → Service → Repository). `@Entity`의 프리젠테이션 계층 노출 금지
+- **Rule-based Matching Engine**: 소비 TOP3 카테고리 가중 점수 매칭으로 카드 추천, 특수 소비 키워드 트리거로 보험 추천
+- **Graph RAG**: NetworkX 기반 정책 간 충돌·연계 관계 그래프 탐색으로 중복 신청 방지 및 연계 신청 팁 제공
+- **Communication**: 동기 호출 시 Spring Cloud OpenFeign + Resilience4j 서킷 브레이커 적용. 비동기 이벤트 통신에는 NATS JetStream 활용
+- **Standard Responses**: 모든 API 응답은 `CommonResponse<T>` 레코드로 일관되게 래핑
+
+---
+
+## 📡 API 명세 요약 (Recommend API Endpoints)
+
+| Domain | Method | Endpoint | Description |
+|--------|--------|----------|-------------|
+| Policy | GET | /api/recommend/policies | 청년 정책 추천 목록 조회 |
+| Policy | GET | /api/v1/recommend/policies/{policyId} | 청년 정책 상세 조회 |
+| Policy | GET | /api/recommend/policies/bookmarks | 북마크한 정책 목록 조회 |
+| Insurance | GET | /api/recommend/insurances | 추천 보험 목록 조회 |
+| Card | GET | /api/recommend/cards/{recommendId} | 카드 추천 상세 조회 |
+| Bookmark | PATCH | /api/recommend/bookmark/patch | 북마크 설정/해제 |
+| Alarm | PATCH | /api/recommend/alarm/patch | 알림 설정/해제 |
+
+---
+
+## 📖 Reference Documentation
+
+- [Spring Boot 공식 문서](https://docs.spring.io/spring-boot/docs/3.5.14/reference/html/)
+- [Spring Data JPA 공식 문서](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/)
+- [Resilience4j 공식 문서](https://resilience4j.readme.io/docs)
+- [OpenFeign 공식 문서](https://docs.spring.io/spring-cloud-openfeign/docs/current/reference/html/)
+- [공공데이터포털 API](https://www.data.go.kr)
+- [금융감독원 통합비교공시 API](https://finlife.fss.or.kr)
