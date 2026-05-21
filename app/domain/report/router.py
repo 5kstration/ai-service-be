@@ -1,83 +1,53 @@
-# app/domain/report/schema.py
-from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime, date
+# app/domain/report/router.py
+import logging
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.domain.report.schema import ReportResponse
+from app.domain.report.service import ReportService
+from app.core.config.database import get_db
+from app.core.common.response import CommonResponse
+from app.core.middleware.auth import get_current_user
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/report", tags=["AI Report"])
 
 
-# =============================================
-# GET /api/ai/report
-# AI 리포트 조회 응답
-# =============================================
+@router.get(
+    "",
+    response_model=CommonResponse[ReportResponse],
+    summary="AI 리포트 조회",
+    description="""
+    AI 리포트 메뉴 진입 시 호출됩니다.
+    날짜는 서버에서 오늘 날짜(year/month/day) 기준으로 자동 계산합니다.
 
-# 리포트 응답 스키마. ai_report 테이블의 row 하나에 대응.
-# LLM이 생성한 summary_message, saving_tip과 지출 집계 데이터가 포함.
-class ReportResponse(BaseModel):
-    report_id: str
-    year: int
-    month: int
-    day: int
-    summary_message: Optional[str]    # LLM이 생성한 전체 요약 문구
-    total_expense: Optional[int]      # 어제까지 누적 총 지출
-    target_expense: Optional[int]     # 사용자가 설정한 목표 지출
-    achievement_rate: Optional[int]   # 목표 대비 달성률 (%)
-    remain_budge: Optional[int]       # 목표 지출 - 총 지출 = 남은 예산
-    remain_days: Optional[int]        # 이번 달 남은 날짜
-    daily_budge: Optional[int]        # 남은 예산 / 남은 날짜 = 오늘 쓸 수 있는 금액
-    saving_tip: Optional[str]         # LLM이 생성한 절약 팁
-    created_at: Optional[datetime]
+    **처리 흐름**
+    1. Redis 캐시 조회 (오늘 날짜 기준 키) → 있으면 즉시 반환
+    2. DB 조회 (오늘 year/month/day 기준) → 있으면 Redis 재캐싱 후 반환
+    3. 없으면 LLM 호출하여 오늘 리포트 생성 → DB 저장 → Redis 캐싱 → 반환
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
-
-
-# =============================================
-# GET /api/ai/report/weekly-expense
-# 주간 지출 데이터 (AI-03 주간 지출 탭 BarChart)
-# =============================================
-
-# 주간 지출 단건 스키마. 이번 달 주차별 지출 데이터.
-class WeeklyExpenseItem(BaseModel):
-    week: str        # "1주", "2주", "3주", "4주"
-    amount: int      # 해당 주 총 지출액
-    start_date: date # 주 시작일
-    end_date: date   # 주 종료일
-
-    class Config:
-        from_attributes = True
-        populate_by_name = True
-
-# 주간 지출 전체 응답 스키마. 이번 달 전체 주차 지출 리스트 반환.
-class WeeklyExpenseResponse(BaseModel):
-    year: int
-    month: int
-    weeks: List[WeeklyExpenseItem]
-
-
-# =============================================
-# GET /api/ai/report/peers-comparison
-# 또래 비교 데이터 (AI-04 또래 비교 탭)
-# =============================================
-
-# 카테고리별 나의 지출 vs 또래 평균 비교 단건.
-# diff_rate 음수 = 또래보다 절약, 양수 = 초과.
-class PeerCategoryItem(BaseModel):
-    category: str          # 교통, 식비, 카페, 배달앱 ...
-    my_amount: int         # 나의 해당 카테고리 지출액
-    peer_avg_amount: int   # 또래 그룹 평균 지출액
-    diff_rate: int         # 차이 비율 (%) ex) -30 = 30% 절약, 41 = 41% 초과
-
-    class Config:
-        populate_by_name = True
-
-# 또래 비교 전체 응답 스키마.
-# monthly_summary 집계 + Qdrant 클러스터링 결과 합산.
-# 개인 식별 불가 수준의 익명화 집계 데이터만 포함.
-class PeersComparisonResponse(BaseModel):
-    peer_group_label: str           # 클러스터링된 또래 그룹명 ex) "20대 중반 직장인"
-    peer_group_size: int            # 또래 그룹 인원 수
-    categories: List[PeerCategoryItem]
-    insight_message: Optional[str]  # LLM이 생성한 또래 비교 요약 문구
-
-    class Config:
-        populate_by_name = True
+    **예외 케이스**
+    - Redis 장애            → 캐시 스킵 후 DB 조회 (서비스 중단 없음)
+    - 캐시 데이터 손상      → 캐시 삭제 후 DB 재조회
+    - 목표 미설정           → target_expense=0 으로 생성 진행
+    - 주간 지출 데이터 없음 → 빈 데이터로 LLM 생성 진행
+    - LLM 호출 실패         → 502
+    - LLM 응답 파싱 실패    → 500
+    - DB 저장 실패          → 500
+    """,
+    responses={
+        200: {"description": "리포트 조회/생성 성공"},
+        401: {"description": "인증 실패"},
+        502: {"description": "LLM 호출 실패"},
+        500: {"description": "서버 오류"},
+    }
+)
+def get_report(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    logger.info(f"[ReportRouter] GET /api/ai/report - user_id={current_user}")
+    service = ReportService(db)
+    data = service.get_or_generate_report(current_user)
+    return CommonResponse.of(data)
