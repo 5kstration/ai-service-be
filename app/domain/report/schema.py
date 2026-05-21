@@ -10,12 +10,13 @@ from datetime import datetime, date
 # =============================================
 
 
-# 전일 기준 리포트 응답 스키마. ai_report 테이블의 row 하나에 대응.
+# 리포트 응답 스키마. ai_report 테이블의 row 하나에 대응.
 # LLM이 생성한 summary_message, saving_tip과 budget service에서 집계된 지출 데이터가 포함.
-class YesterdayReportResponse(BaseModel):
+class ReportResponse(BaseModel):
     report_id: str
     year: int
     month: int
+    day: int
     summary_message: Optional[str]    # LLM이 생성한 전체 요약 문구
     total_expense: Optional[int]      # 어제까지 누적 총 지출
     target_expense: Optional[int]     # 사용자가 설정한 목표 지출
@@ -40,13 +41,14 @@ class YesterdayReportResponse(BaseModel):
 # AI 전일 기준 리포트 생성 요청 (AI-02 버튼 클릭)
 # =============================================
 
-# 전일 기준 리포트 생성 요청 스키마. year, month로 어떤 기간의 리포트를 생성할지 지정.
-class YesterdayReportRequest(BaseModel):
+#리포트 생성 요청 스키마. year, monthm,day로 어떤 기간의 리포트를 생성할지 지정.
+class ReportRequest(BaseModel):
     year: int
     month: int
+    day: int
 
-# 전일 기준 리포트 생성 응답 스키마. 생성 완료 메시지 전달.
-class YesterdayReportGenerateResponse(BaseModel):
+#리포트 생성 응답 스키마. 생성 완료 메시지 전달.
+class ReportGenerateResponse(BaseModel):
     message: str
 
 
