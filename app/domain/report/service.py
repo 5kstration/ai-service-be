@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.domain.report.repository import ReportRepository
 from app.domain.report.schema import ReportResponse
 from app.domain.report.entity import AiReport
-from app.core.config.redis import redis_client
+from app.core.config.redis import get_redis_client
 from app.core.error.exception import BusinessException
 from app.core.error.error_code import ErrorCode
 from app.core.utils.tsid import TSID
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 REPORT_CACHE_TTL    = 86400  # 리포트 캐시 TTL: 1일
 GENERATING_LOCK_TTL = 60     # LLM 생성 중 분산 락 TTL: 60초 (비정상 종료 시 자동 해제)
 LLM_MAX_RETRY       = 2      # LLM 호출 최대 재시도 횟수
-LLM_RETRY_DELAY     = 3    # LLM 재시도 간격 (초)
+LLM_RETRY_DELAY     = 1.5    # LLM 재시도 간격 (초)
 LOCK_WAIT_SECONDS   = 3      # 락 대기 후 DB 재조회까지 대기 시간 (초)
 
 
@@ -36,15 +36,16 @@ def _lock_key(user_id: str) -> str:
     today = date.today()
     return f"report:lock:{user_id}:{today.year}:{today.month}:{today.day}"
 
-# report생성 로직 + Redis 캐싱 + 동시성 락
+
 class ReportService:
     def __init__(self, db: Session):
         self.repo = ReportRepository(db)
 
-
-    // ai 리포트 메뉴 진입 시 호출되는 메인 함수. Redis → DB → LLM 생성 순으로 처리.
     def get_or_generate_report(self, user_id: str) -> ReportResponse:
- 
+        """
+        AI 리포트 메뉴 진입 시 호출.
+        Redis → DB → LLM 생성 순으로 처리.
+        """
         cache_key = _cache_key(user_id)
         lock_key  = _lock_key(user_id)
 
@@ -86,7 +87,7 @@ class ReportService:
             logger.info(f"[ReportService] 락 획득 성공 - LLM 생성 시작. user_id={user_id}")
             return self._generate_report(user_id, cache_key)
         finally:
-            # 성공/실패 무관하게 락  해제
+            # 성공/실패 무관하게 락 반드시 해제
             self._release_lock(lock_key)
 
     # =============================================
@@ -195,11 +196,12 @@ class ReportService:
         - Redis 장애: 락 없이 진행
         - TTL 설정으로 비정상 종료 시 자동 해제 보장
         """
-        if not redis_client:
+        client = get_redis_client()
+        if not client:
             logger.warning("[ReportService] Redis 없음 - 락 없이 진행")
             return True
         try:
-            acquired = redis_client.set(lock_key, "1", nx=True, ex=GENERATING_LOCK_TTL)
+            acquired = client.set(lock_key, "1", nx=True, ex=GENERATING_LOCK_TTL)
             if acquired:
                 logger.info(f"[ReportService] 락 획득 - key={lock_key}")
             else:
@@ -215,10 +217,11 @@ class ReportService:
         분산 락 해제.
         finally 블록에서 호출되므로 실패해도 TTL로 자동 만료.
         """
-        if not redis_client:
+        client = get_redis_client()
+        if not client:
             return
         try:
-            redis_client.delete(lock_key)
+            client.delete(lock_key)
             logger.info(f"[ReportService] 락 해제 - key={lock_key}")
         except Exception as e:
             # 해제 실패해도 TTL(60초)로 자동 만료되므로 서비스 영향 없음
@@ -234,10 +237,11 @@ class ReportService:
         - 연결 실패: None 반환 → DB 조회로 fallback
         - 데이터 손상: 캐시 삭제 후 None 반환 → DB 재조회
         """
-        if not redis_client:
+        client = get_redis_client()
+        if not client:
             return None
         try:
-            cached = redis_client.get(cache_key)
+            cached = client.get(cache_key)
             if not cached:
                 return None
             return ReportResponse(**json.loads(cached))
@@ -245,7 +249,7 @@ class ReportService:
             # 캐시 데이터 손상 → 삭제 후 DB 재조회
             logger.error(f"[ReportService] 캐시 손상 - key={cache_key}, error={e}")
             try:
-                redis_client.delete(cache_key)
+                client.delete(cache_key)
             except Exception as e:
                 logger.warning(f"[ReportService] 손상 캐시 삭제 실패 - key={cache_key}, error={e}")
             return None
@@ -259,11 +263,12 @@ class ReportService:
         Redis 캐싱.
         실패해도 응답은 정상 반환 (캐싱 실패가 서비스 실패로 전파되지 않음).
         """
-        if not redis_client:
+        client = get_redis_client()
+        if not client:
             logger.warning("[ReportService] Redis 없음 - 캐싱 스킵")
             return
         try:
-            redis_client.setex(cache_key, REPORT_CACHE_TTL, response.model_dump_json())
+            client.setex(cache_key, REPORT_CACHE_TTL, response.model_dump_json())
             logger.info(f"[ReportService] 캐시 저장 완료 - key={cache_key}, ttl={REPORT_CACHE_TTL}s")
         except Exception as e:
             # 캐싱 실패해도 응답은 정상 반환

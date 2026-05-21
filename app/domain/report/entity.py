@@ -12,6 +12,7 @@ class AiReport(Base):
     user_id          = Column(String(26), nullable=False)
     year             = Column(Integer,    nullable=False)
     month            = Column(Integer,    nullable=False)
+    day              = Column(Integer,    nullable=False)
     summary_message  = Column(Text)
     total_expense    = Column(Integer)
     target_expense   = Column(Integer)
@@ -20,8 +21,6 @@ class AiReport(Base):
     remain_days      = Column(Integer,    nullable=True)   # 이번 달 남은 날짜
     daily_budge      = Column(Integer,    nullable=True)   # 남은 예산 / 남은 날짜
     saving_tip       = Column(String(255),nullable=True)   # LLM이 생성한 절약 팁
-
-    insight_id       = Column(String(26))
     created_at       = Column(DateTime,   nullable=False, server_default=func.now())
     updated_at       = Column(DateTime,   nullable=False, server_default=func.now(), onupdate=func.now())
 

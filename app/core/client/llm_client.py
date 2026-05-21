@@ -131,7 +131,7 @@ class LLMClient:
         try:
             parsed = json.loads(clean)
         except json.JSONDecodeError as e:
-            logger.error(f"[LLMClient] JSON 파싱 실패 - raw={raw}, user_id={user_id}, error={e}")
+            logger.error(f"[LLMClient] JSON 파싱 실패 - user_id={user_id}, raw_len={len(raw)}, error={e}")
             raise BusinessException(ErrorCode.LLM_RESPONSE_PARSE_FAILED)
 
         # 3. 필드 추출 및 검증
@@ -139,7 +139,7 @@ class LLMClient:
         saving_tip = parsed.get("saving_tip", "").strip()
 
         if not summary:
-            logger.error(f"[LLMClient] summary_message 누락 - raw={raw}, user_id={user_id}")
+            logger.error(f"[LLMClient] summary_message 누락 - user_id={user_id}, raw_len={len(raw)}")
             raise BusinessException(ErrorCode.LLM_RESPONSE_PARSE_FAILED)
 
         return summary, saving_tip
