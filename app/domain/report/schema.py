@@ -51,8 +51,21 @@ class WeeklyExpenseResponse(BaseModel):
     year: int
     month: int
     weeks: List[WeeklyExpenseItem]
+    categories: List[CategoryExpenseItem]
 
-
+    
+# 카테고리별 도넛차트 단건
+class CategoryExpenseItem(BaseModel):
+    category: str    # "식비", "카페", "쇼핑" ...
+    amount: int      # 해당 카테고리 총 지출액
+    ratio: float     # 전체 대비 비율 ex) 37.0 = 37%
+ 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+        
+        
+        
 # =============================================
 # GET /api/ai/report/peers-comparison
 # 또래 비교 데이터 (AI-04 또래 비교 탭)
@@ -81,3 +94,4 @@ class PeersComparisonResponse(BaseModel):
 
     class Config:
         populate_by_name = True
+        from_attributes = True
