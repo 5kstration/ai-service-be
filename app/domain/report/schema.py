@@ -8,7 +8,7 @@ from datetime import datetime, date
 # GET /api/ai/report
 # AI 리포트 조회 응답
 # =============================================
-
+ 
 # 리포트 응답 스키마. ai_report 테이블의 row 하나에 대응.
 class ReportResponse(BaseModel):
     report_id: str
@@ -19,9 +19,9 @@ class ReportResponse(BaseModel):
     total_expense: Optional[int] = None     # 어제까지 누적 총 지출
     target_expense: Optional[int]   = None  # 사용자가 설정한 목표 지출
     achievement_rate: Optional[int]  = None # 목표 대비 달성률 (%)
-    remain_budge: Optional[int]     = None  # 목표 지출 - 총 지출 = 남은 예산
+    remain_budget: Optional[int]     = None  # 목표 지출 - 총 지출 = 남은 예산
     remain_days: Optional[int]      = None  # 이번 달 남은 날짜
-    daily_budge: Optional[int]      = None  # 남은 예산 / 남은 날짜 = 오늘 쓸 수 있는 금액
+    daily_budget: Optional[int]      = None  # 남은 예산 / 남은 날짜 = 오늘 쓸 수 있는 금액
     saving_tip: Optional[str]       = None  # LLM이 생성한 절약 팁
     created_at: Optional[datetime]  = None
 
