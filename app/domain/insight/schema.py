@@ -1,43 +1,60 @@
 # app/domain/insight/schema.py
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
+from typing import Optional, List
+from datetime import date
 
 
 # =============================================
 # GET /api/ai/insights
-# AI 인사이트 목록 (AI-05, AI-06 하단 카드 섹션)
+# AI 인사이트 전체 (AI-03 ~ AI-06)
 # =============================================
-# AI 인사이트 항목 스키마.  각 인사이트 카드의 정보를 담는 모델
-class InsightItem(BaseModel):
-    insight_id: str
-    report_id: Optional[str]        # 연결된 리포트 ID
-    insight_type: str               # InsightType enum ex) "월별 분석", "카드 추천"
-    insight_title: str              # 카드 제목 ex) "카페 지출 줄었어요"
-    description: Optional[str]      # 카드 본문 설명
-    icon_type: Optional[str]        # 프론트 아이콘 컴포넌트명 ex) TrendingDown, TrendingUp, Users
-    accent_color: Optional[str]     # 카드 강조색 hex 코드 ex) "#3182F6"
-    created_at: Optional[datetime]
+
+class WeeklyExpenseItem(BaseModel):
+    """주차별 BarChart 단건."""
+    week: str        # "1주", "2주", "3주", "4주"
+    amount: int
+    start_date: date
+    end_date: date
 
     class Config:
         from_attributes = True
         populate_by_name = True
 
-# AI 인사이트 목록 응답 스키마.
-class InsightListResponse(BaseModel):
-    insights: list[InsightItem]
+
+class CategoryExpenseItem(BaseModel):
+    """카테고리별 도넛차트 단건."""
+    category: str
+    amount: int
+    ratio: float     # ex) 37.0 = 37%
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 
-# =============================================
-# 인사이트 생성 (내부용 - ai service 내부 생성 시)
-# =============================================
+class InsightCardItem(BaseModel):
+    """인사이트 카드 단건."""
+    insight_type: str               # "weekly_trend", "overspend", "peer_compare", "goal_status"
+    title: str
+    description: str
+    icon_type: str                  # "TrendingDown", "TrendingUp", "Users", "Target"
+    accent_color: str               # hex 코드
+    metric_value: Optional[str] = None  # 강조 수치 ex) "18%", "30% 절약"
 
-# AI 인사이트 생성 요청 스키마.
-class InsightCreate(BaseModel):
-    user_id: str
-    report_id: Optional[str] = None
-    insight_type: str
-    insight_title: str
-    description: Optional[str] = None
-    icon_type: Optional[str] = None
-    accent_color: Optional[str] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class InsightResponse(BaseModel):
+    """
+    인사이트 전체 응답.
+    - weeks: 주간 지출 BarChart
+    - categories: 카테고리별 도넛차트
+    - insights: 인사이트 카드 (최대 4개)
+    """
+    year: int
+    month: int
+    weeks: List[WeeklyExpenseItem]
+    categories: List[CategoryExpenseItem]
+    insights: List[InsightCardItem]

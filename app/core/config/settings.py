@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "claude-haiku-4-5-20251001"
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
-
+    NATS_URL: str = "nats://localhost:4222"
     class Config:
         env_file = ".env"
         extra = "ignore"  # 추가
