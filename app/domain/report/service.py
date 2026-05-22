@@ -16,7 +16,7 @@ from app.core.error.exception import BusinessException
 from app.core.error.error_code import ErrorCode
 from app.core.utils.tsid import TSID
 from app.core.client.llm_client import llm_client
-
+from app.domain.report.schema import ReportResponse, PeersComparisonResponse, PeerCategoryItem
 logger = logging.getLogger(__name__)
 
 REPORT_CACHE_TTL    = 86400  # 리포트 캐시 TTL: 1일
@@ -40,6 +40,72 @@ def _lock_key(user_id: str) -> str:
 class ReportService:
     def __init__(self, db: Session):
         self.repo = ReportRepository(db)
+
+
+
+#=============================================
+# 또래비교 리턴
+# =============================================
+ 
+    def get_peers_comparison(self, user_id: str) -> PeersComparisonResponse:
+        """
+        카테고리별 나의 지출 vs 또래 평균 비교.
+ 
+        예외 케이스:
+        - 온보딩 정보 없음  → categories 빈 리스트 반환
+        - 또래 5명 미만     → categories 빈 리스트 반환
+        - 내 데이터 없음    → categories 빈 리스트 반환
+        """
+        today = date.today()
+ 
+        peer_avgs    = self.repo.find_peer_avg_by_category(user_id)
+        my_summaries = self.repo.find_monthly_summary_current_month(user_id)
+ 
+        if not peer_avgs or not my_summaries:
+            return PeersComparisonResponse(
+                year       = today.year,
+                month      = today.month,
+                categories = [],
+            )
+ 
+        my_map = {s.category: (s.amount or 0) for s in my_summaries}
+ 
+        categories = []
+        for peer in peer_avgs:
+            my_amount       = my_map.get(peer["category"], 0)
+            peer_avg_amount = peer["avg_amount"]
+            diff_amount     = my_amount - peer_avg_amount
+            diff_rate       = int(diff_amount / peer_avg_amount * 100) if peer_avg_amount > 0 else 0
+ 
+            categories.append(PeerCategoryItem(
+                category        = peer["category"],
+                my_amount       = my_amount,
+                peer_avg_amount = peer_avg_amount,
+                diff_amount     = diff_amount,
+                diff_rate       = diff_rate,
+            ))
+ 
+        # 가장 많이 절약한 카테고리 (diff_amount 음수인 것 중 가장 큰 절약)
+        saving_categories = [c for c in categories if c.diff_amount < 0]
+        best_saving = min(saving_categories, key=lambda x: x.diff_amount) if saving_categories else None
+ 
+        return PeersComparisonResponse(
+            year                 = today.year,
+            month                = today.month,
+            categories           = categories,
+            best_saving_category = best_saving.category if best_saving else None,
+            best_saving_amount   = abs(best_saving.diff_amount) if best_saving else None,
+        )
+ 
+ 
+
+
+
+
+
+# =============================================
+# AI 리포트 조회/생성 로직
+# =============================================
 
     def get_or_generate_report(self, user_id: str) -> ReportResponse:
         """
@@ -89,6 +155,7 @@ class ReportService:
         finally:
             # 성공/실패 무관하게 락 반드시 해제
             self._release_lock(lock_key)
+
 
     # =============================================
     # LLM 생성 로직
