@@ -1,5 +1,5 @@
 # app/domain/profile/entity.py
-from sqlalchemy import Column, String, BigInteger, Date, DateTime
+from sqlalchemy import Column, String, Integer, Date, DateTime
 from sqlalchemy.sql import func
 from app.core.config.database import Base
 from app.core.utils.tsid import TSID

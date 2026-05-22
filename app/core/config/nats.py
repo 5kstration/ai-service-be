@@ -10,14 +10,16 @@ _js = None
 
 
 async def get_nats_client():
-    """NATS 클라이언트 반환. 없으면 연결 시도."""
     global _nats_client
     if _nats_client is None or not _nats_client.is_connected:
         try:
-            _nats_client = await nats.connect(settings.NATS_URL)
+            _nats_client = await nats.connect(
+                settings.NATS_URL,
+                connect_timeout=3,  # 3초 타임아웃
+            )
             logger.info(f"[NATS] 연결 성공 - {settings.NATS_URL}")
         except Exception as e:
-            logger.error(f"[NATS] 연결 실패 - {settings.NATS_URL}, error={e}")
+            logger.warning(f"[NATS] 연결 실패 - consumer 비활성화. error={e}")
             return None
     return _nats_client
 
@@ -54,3 +56,5 @@ async def start_consumers():
         logger.info(f"[NATS] consumer 등록 완료 - subject={ONBOARDING_SUBJECT}")
     except Exception as e:
         logger.error(f"[NATS] consumer 등록 실패 - error={e}")
+        
+        # todo 

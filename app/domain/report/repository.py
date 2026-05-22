@@ -8,10 +8,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func, text
 from app.domain.profile.entity import UserProfile
 from datetime import date
-from app.domain.report.entity import AiReport, WeeklyExpense, Goal
+from app.domain.report.entity import AiReport, WeeklyExpense, Goal,MonthlySummary
 from app.core.error.exception import BusinessException
 from app.core.error.error_code import ErrorCode
-
 logger = logging.getLogger(__name__)
 
 
@@ -98,13 +97,31 @@ class ReportRepository:
             ]
  
         except SQLAlchemyError as e:
+            self.db.rollback()
             logger.error(f"[ReportRepository] 또래 집계 실패 - user_id={user_id}, error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
 
 
-
-
-
+        
+    def find_monthly_summary_current_month(self, user_id: str) -> list[MonthlySummary]:
+        # 이번 달 카테고리별 지출 집계 조회.
+        # 도넛차트 렌더링 및 인사이트 카드 생성에 사용.
+        # 금액 내림차순 정렬.
+        today = date.today()
+        try:
+            return (
+                self.db.query(MonthlySummary)
+                .filter(
+                    MonthlySummary.user_id == user_id,
+                    MonthlySummary.year    == today.year,
+                    MonthlySummary.month   == today.month,
+                )
+                .order_by(MonthlySummary.amount.desc())
+                .all()
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"[ReportRepository] 카테고리 집계 조회 실패 - user_id={user_id}, error={e}")
+            raise BusinessException(ErrorCode.DB_ERROR)
 # =============================================
 # 리포트 조회/저장 관련 DB 처리
 # =============================================
