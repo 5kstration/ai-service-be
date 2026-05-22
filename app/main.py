@@ -18,7 +18,7 @@ app.include_router(insight_router, prefix="/api/ai", tags=["Insight"])
 def health_check():
     return {"status": "ok"}
 
-# NATS 소비자 시작 - 애플리케이션 스타트업 시점에 실행
+# NATS 소비자 시작 - 애플리케이션  시점에 실행
 #@app.on_event("startup")
 #async def startup():
 #    await start_consumers()

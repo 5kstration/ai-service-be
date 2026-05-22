@@ -10,13 +10,14 @@ _js = None
 
 
 async def get_nats_client():
-    global _nats_client
+    global _nats_client, _js
     if _nats_client is None or not _nats_client.is_connected:
         try:
             _nats_client = await nats.connect(
                 settings.NATS_URL,
-                connect_timeout=3,  # 3초 타임아웃
+                connect_timeout=3,
             )
+            _js = None  # 재연결 시 JetStream 캐시 무효화
             logger.info(f"[NATS] 연결 성공 - {settings.NATS_URL}")
         except Exception as e:
             logger.warning(f"[NATS] 연결 실패 - consumer 비활성화. error={e}")
@@ -25,7 +26,6 @@ async def get_nats_client():
 
 
 async def get_jetstream():
-    """JetStream 컨텍스트 반환."""
     global _js
     client = await get_nats_client()
     if not client:
@@ -36,10 +36,6 @@ async def get_jetstream():
 
 
 async def start_consumers():
-    """
-    앱 시작 시 모든 NATS consumer 등록.
-    main.py의 startup 이벤트에서 호출.
-    """
     from app.domain.profile.consumer import handle_onboarding_event, ONBOARDING_SUBJECT
 
     js = await get_jetstream()
@@ -50,11 +46,9 @@ async def start_consumers():
     try:
         await js.subscribe(
             ONBOARDING_SUBJECT,
-            durable   = "ai-service-onboarding-consumer",  # 내구성 consumer
-            cb        = handle_onboarding_event,
+            durable = "ai-service-onboarding-consumer",
+            cb      = handle_onboarding_event,
         )
         logger.info(f"[NATS] consumer 등록 완료 - subject={ONBOARDING_SUBJECT}")
     except Exception as e:
         logger.error(f"[NATS] consumer 등록 실패 - error={e}")
-        
-        # todo 

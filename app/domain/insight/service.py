@@ -5,7 +5,7 @@ from datetime import date
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from app.domain.report.entity import AiReport, WeeklyExpense, Goal, MonthlySummary
+
 from app.domain.report.repository import ReportRepository
 from app.domain.insight.schema import (
     InsightResponse,
@@ -33,13 +33,9 @@ class InsightService:
         """
         today = date.today()
 
-        # 1. 주간 지출 조회
         weekly_expenses   = self.repo.find_weekly_expenses_current_month(user_id)
-
-        # 2. 카테고리별 집계 조회
         monthly_summaries = self.repo.find_monthly_summary_current_month(user_id)
 
-        # 3. 주간 BarChart 변환
         weeks = [
             WeeklyExpenseItem(
                 week       = f"{w.week}주",
@@ -50,7 +46,6 @@ class InsightService:
             for w in weekly_expenses
         ]
 
-        # 4. 도넛차트 변환
         categories = [
             CategoryExpenseItem(
                 category = s.category or "기타",
@@ -60,7 +55,6 @@ class InsightService:
             for s in monthly_summaries
         ]
 
-        # 5. 인사이트 카드 생성 (각각 독립 실패 허용)
         insights = []
 
         weekly_card = self._build_weekly_trend_card(weekly_expenses)
@@ -71,15 +65,11 @@ class InsightService:
         if overspend_card:
             insights.append(overspend_card)
 
-        logger.warning("[InsightService] peer_card 시작")  # 추가
         peer_card = self._build_peer_compare_card(user_id, monthly_summaries)
-        logger.warning(f"[InsightService] peer_card 결과: {peer_card}")  # 추가
         if peer_card:
             insights.append(peer_card)
 
-        logger.warning("[InsightService] goal_card 시작")  # 추가
         goal_card = self._build_goal_status_card(user_id, today)
-        logger.warning(f"[InsightService] goal_card 결과: {goal_card}")  # 추가
         if goal_card:
             insights.append(goal_card)
 
@@ -95,10 +85,7 @@ class InsightService:
     # 카드 1: 지난주 대비 증감
     # =============================================
     def _build_weekly_trend_card(self, weekly_expenses: list) -> Optional[InsightCardItem]:
-        """
-        이번 주 vs 지난 주 지출 비교.
-        주간 데이터 2개 미만이면 None 반환.
-        """
+        """주간 데이터 2개 미만이면 None 반환."""
         try:
             if len(weekly_expenses) < 2:
                 return None
@@ -135,8 +122,7 @@ class InsightService:
     # =============================================
     def _build_overspend_card(self, monthly_summaries: list) -> Optional[InsightCardItem]:
         """
-        카테고리별 지출에서 가장 높은 비율 카테고리 경고.
-        데이터 없으면 None 반환.
+        가장 높은 카테고리 경고.
         LLM 실패 시 기본 문구로 대체.
         """
         try:
@@ -146,7 +132,6 @@ class InsightService:
             top   = monthly_summaries[0]  # amount 내림차순 정렬되어 있음
             ratio = float(top.ratio or 0)
 
-            # LLM으로 친근한 경고 문구 생성 (실패 시 기본 문구)
             try:
                 description = llm_client.generate_overspend_message(
                     category = top.category,
@@ -154,6 +139,7 @@ class InsightService:
                     ratio    = ratio,
                 )
             except Exception:
+                # LLM 실패 시 기본 문구로 대체 (서비스 중단 없음)
                 description = f"이번 달 {top.category} 지출이 전체의 {ratio:.0f}%를 차지하고 있어요."
 
             return InsightCardItem(
@@ -174,13 +160,10 @@ class InsightService:
     def _build_peer_compare_card(self, user_id: str, monthly_summaries: list) -> Optional[InsightCardItem]:
         """
         또래 그룹 평균과 나의 지출 비교.
-        가장 차이 큰 카테고리 하나 노출.
         또래 그룹 5명 미만이면 None 반환.
         """
         try:
             peer_avgs = self.repo.find_peer_avg_by_category(user_id)
-            logger.info(f"[InsightService] peer_avgs: {peer_avgs}")  # 여기
-            logger.info(f"[InsightService] monthly_summaries: {[(s.category, s.amount) for s in monthly_summaries]}")  # 여기
             if not peer_avgs or not monthly_summaries:
                 return None
 
@@ -193,8 +176,8 @@ class InsightService:
                 if peer_amount > 0:
                     diff_pct = int((my_amount - peer_amount) / peer_amount * 100)
                     diffs.append({
-                        "category":   peer["category"],
-                        "diff_pct":   diff_pct,
+                        "category": peer["category"],
+                        "diff_pct": diff_pct,
                     })
 
             if not diffs:
@@ -222,7 +205,7 @@ class InsightService:
                     metric_value = f"{diff_pct}% 초과",
                 )
         except Exception as e:
-            logger.error(f"[InsightService] 또래 비교 카드 생성 실패 - user_id={user_id}, error={e}")
+            logger.error(f"[InsightService] 또래 비교 카드 생성 실패 - error={e}")
             return None
 
     # =============================================
@@ -230,8 +213,13 @@ class InsightService:
     # =============================================
     def _build_goal_status_card(self, user_id: str, today: date) -> Optional[InsightCardItem]:
         """
-        남은 예산과 남은 일수 기반으로 목표 달성 가능 여부 판단.
+        목표 달성 가능 여부 판단.
         목표 미설정이면 None 반환.
+
+        분기:
+        - remain_budge < 0         → 초과 (빨간 카드)
+        - remain_budge >= 0, 월말  → 달성 성공 (초록 카드)
+        - remain_budge >= 0, 남은 일 있음 → 달성 가능 (초록 카드)
         """
         try:
             goal = self.repo.find_goal_current_month(user_id)
@@ -243,7 +231,28 @@ class InsightService:
             remain_days      = calendar.monthrange(today.year, today.month)[1] - today.day
             achievement_rate = int(total_expense / goal.goal_expense * 100)
 
-            if remain_budge > 0 and remain_days > 0:
+            if remain_budge < 0:
+                # 예산 초과
+                return InsightCardItem(
+                    insight_type = "goal_status",
+                    title        = "이번 달 목표 초과",
+                    description  = f"목표를 {abs(remain_budge):,}원 초과했어요. 다음 달엔 더 잘 할 수 있어요!",
+                    icon_type    = "Target",
+                    accent_color = "#F43F5E",
+                    metric_value = f"{achievement_rate}% 달성",
+                )
+            elif remain_days == 0:
+                # 월말 + 예산 초과 아님 → 달성 성공
+                return InsightCardItem(
+                    insight_type = "goal_status",
+                    title        = "이번 달 목표 달성 성공!",
+                    description  = f"이번 달 목표를 지켰어요. 남은 예산 {remain_budge:,}원 절약 성공!",
+                    icon_type    = "Target",
+                    accent_color = "#10B981",
+                    metric_value = f"{achievement_rate}% 달성",
+                )
+            else:
+                # 예산 남아있고 날도 남아있음 → 달성 가능
                 daily_budge = int(remain_budge / remain_days)
                 return InsightCardItem(
                     insight_type = "goal_status",
@@ -253,15 +262,6 @@ class InsightService:
                     accent_color = "#10B981",
                     metric_value = f"{achievement_rate}% 달성",
                 )
-            else:
-                return InsightCardItem(
-                    insight_type = "goal_status",
-                    title        = "이번 달 목표 초과",
-                    description  = f"목표를 {abs(remain_budge):,}원 초과했어요. 다음 달엔 더 잘 할 수 있어요!",
-                    icon_type    = "Target",
-                    accent_color = "#F43F5E",
-                    metric_value = f"{achievement_rate}% 달성",
-                )
         except Exception as e:
-            logger.error(f"[InsightService] 목표 달성 카드 생성 실패 - user_id={user_id}, error={e}")
+            logger.error(f"[InsightService] 목표 달성 카드 생성 실패 - error={e}")
             return None
