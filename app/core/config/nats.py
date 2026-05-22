@@ -2,6 +2,7 @@
 import logging
 import nats
 from app.core.config.settings import settings
+from app.domain.profile.consumer import handle_onboarding_event, ONBOARDING_SUBJECT
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,8 @@ async def get_nats_client():
                 settings.NATS_URL,
                 connect_timeout=3,
             )
-            _js = None  # 재연결 시 JetStream 캐시 무효화
-            logger.info(f"[NATS] 연결 성공 - {settings.NATS_URL}")
+            _js = None
+            logger.warning(f"[NATS] 연결 성공 - {settings.NATS_URL}")  
         except Exception as e:
             logger.warning(f"[NATS] 연결 실패 - consumer 비활성화. error={e}")
             return None
@@ -36,9 +37,9 @@ async def get_jetstream():
 
 
 async def start_consumers():
-    from app.domain.profile.consumer import handle_onboarding_event, ONBOARDING_SUBJECT
 
     js = await get_jetstream()
+    logger.warning(f"[NATS] js 획득: {js}") 
     if not js:
         logger.warning("[NATS] JetStream 없음 - consumer 등록 스킵")
         return
@@ -48,7 +49,8 @@ async def start_consumers():
             ONBOARDING_SUBJECT,
             durable = "ai-service-onboarding-consumer",
             cb      = handle_onboarding_event,
+            manual_ack=True,
         )
-        logger.info(f"[NATS] consumer 등록 완료 - subject={ONBOARDING_SUBJECT}")
+        logger.warning(f"[NATS] consumer 등록 완료 - subject={ONBOARDING_SUBJECT}")
     except Exception as e:
-        logger.error(f"[NATS] consumer 등록 실패 - error={e}")
+        logger.warning(f"[NATS] consumer 등록 실패 - error={e}")
