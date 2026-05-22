@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/report", tags=["AI Report"])
 
 # ======================================
-# AI 리포트 조회/생성 엔드포인트
+# AI 리포트 조회/생성 엔드포인트 추가
 # ======================================
 @router.get(
     "",
