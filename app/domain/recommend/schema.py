@@ -13,11 +13,11 @@ class BenefitItem(BaseModel):
     value: str
 
 
+ 
 # =============================================
 # GET /api/recommend/policies
-# 청년 정책 추천 목록
 # =============================================
-
+ 
 class PolicyListItem(BaseModel):
     policy_id:      str
     title:          str
@@ -28,23 +28,22 @@ class PolicyListItem(BaseModel):
     dday:           int
     tags:           List[str]
     is_bookmarked:  bool = False
-
+ 
     class Config:
         from_attributes = True
         populate_by_name = True
-
-
+ 
+ 
 class PolicyListResponse(BaseModel):
     policies:    List[PolicyListItem]
     total_count: int
     has_next:    bool
-
-
+ 
+ 
 # =============================================
 # GET /api/recommend/policies/{policyId}
-# 청년 정책 상세
 # =============================================
-
+ 
 class PolicyDetailResponse(BaseModel):
     policy_id:             str
     title:                 str
@@ -64,9 +63,58 @@ class PolicyDetailResponse(BaseModel):
     description:           Optional[str]   = None
     apply_url:             Optional[str]   = None
     ai_recommend_reason:   Optional[str]   = None
-
+ 
     class Config:
         from_attributes = True
         populate_by_name = True
-
-
+ 
+ 
+# =============================================
+# GET /api/recommend/insurances
+# =============================================
+ 
+class InsuranceItem(BaseModel):
+    recommend_id:   str
+    insurer:        str
+    insurance_name: str
+    top_benefit:    str
+    benefits:       List[BenefitItem]
+    match_reason:   str
+    accent_color:   str
+    apply_url:      Optional[str] = None
+    is_bookmarked:  bool = False
+ 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+ 
+ 
+class InsuranceListResponse(BaseModel):
+    recommended_at: Optional[datetime] = None
+    insurances:     List[InsuranceItem]
+ 
+ 
+# =============================================
+# GET /api/recommend/cards
+# =============================================
+ 
+class CardItem(BaseModel):
+    recommend_id:  str
+    company:       str
+    card_name:     str
+    top_benefit:   str
+    benefits:      List[BenefitItem]
+    match_reason:  str
+    accent_color:  str
+    apply_url:     Optional[str] = None
+    is_bookmarked: bool = False
+ 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+ 
+ 
+class CardListResponse(BaseModel):
+    recommended_at: Optional[datetime] = None
+    cards:          List[CardItem]
+ 
