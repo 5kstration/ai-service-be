@@ -35,26 +35,26 @@ class ReportResponse(BaseModel):
 # 또래 비교 데이터 (AI-04 또래 비교 탭)
 # =============================================
 
-# 카테고리별 나의 지출 vs 또래 평균 비교 단건.
-# diff_rate 음수 = 또래보다 절약, 양수 = 초과.
 class PeerCategoryItem(BaseModel):
-    category: str          # 교통, 식비, 카페, 배달앱 ...
-    my_amount: int         # 나의 해당 카테고리 지출액
-    peer_avg_amount: int   # 또래 그룹 평균 지출액
-    diff_rate: int         # 차이 비율 (%) ex) -30 = 30% 절약, 41 = 41% 초과
-
+    """카테고리별 나 vs 또래 비교 단건."""
+    category: str        # "식비", "카페", "교통" ...
+    my_amount: int       # 나의 지출액
+    peer_avg_amount: int # 또래 평균 지출액
+    diff_amount: int     # 차이 금액 (양수=초과, 음수=절약)
+    diff_rate: int       # 차이 비율 (%) ex) 10 = 10% 초과, -18 = 18% 절약
+ 
     class Config:
-        populate_by_name = True
         from_attributes = True
-
-# 또래 비교 전체 응답 스키마.
-# monthly_summary 집계 + Qdrant 클러스터링 결과 합산.
-# 개인 식별 불가 수준의 익명화 집계 데이터만 포함.
+        populate_by_name = True
+ 
+ 
 class PeersComparisonResponse(BaseModel):
-    peer_group_label: str           # 클러스터링된 또래 그룹명 ex) "20대 중반 직장인"
-    peer_group_size: int            # 또래 그룹 인원 수
+    """또래 비교 전체 응답."""
+    year: int
+    month: int
     categories: List[PeerCategoryItem]
-    insight_message: Optional[str]  = None # LLM이 생성한 또래 비교 요약 문구
-
+    best_saving_category: Optional[str] = None  # 가장 많이 절약한 카테고리
+    best_saving_amount: Optional[int]   = None  # 절약 금액 (절약한 경우만)
+ 
     class Config:
         populate_by_name = True

@@ -10,45 +10,27 @@ from app.core.config.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
-ONBOARDING_SUBJECT = "auth.onboarding.created"
 
-
-async def handle_onboarding_event(msg):
+async def handle_onboarding_event(body: str):
     """
-    auth-service 온보딩 등록 이벤트 수신 처리.
-
-    예외 케이스:
-    - decode 실패      → 로그 후 ack (재시도 무의미)
-    - JSON 파싱 실패   → 로그 후 ack (재시도 무의미)
-    - userId 누락      → 로그 후 ack (재시도 무의미)
-    - 입력값 검증 실패 → 로그 후 ack (데이터 오류는 재시도로 복구 불가)
-    - DB 저장 실패     → nak (재시도)
+    SQS 온보딩 이벤트 메시지 처리.
+    auth-service가 SQS에 직접 발행한 메시지를 수신.
     """
 
-    # 1. decode
+    # 1. JSON 파싱
     try:
-        raw = msg.data.decode("utf-8")
-    except Exception as e:
-        logger.error(f"[ProfileConsumer] decode 실패 - error={e}")
-        await msg.ack()  # 바이너리 오류는 재시도 무의미
-        return
-
-    # 2. JSON 파싱
-    try:
-        data = json.loads(raw)
+        data = json.loads(body)
     except json.JSONDecodeError as e:
-        logger.error(f"[ProfileConsumer] JSON 파싱 실패 - raw={raw}, error={e}")
-        await msg.ack()
-        return
+        logger.error(f"[ProfileConsumer] JSON 파싱 실패 - error={e}")
+        raise
 
-    # 3. userId 검증
+    # 2. userId 검증
     user_id = data.get("userId")
     if not user_id or not isinstance(user_id, str) or not user_id.strip():
-        logger.error(f"[ProfileConsumer] userId 누락 또는 유효하지 않음 - data={data}")
-        await msg.ack()
-        return
+        logger.error(f"[ProfileConsumer] userId 누락 또는 유효하지 않음")
+        raise ValueError("userId 누락")
 
-    # 4. 입력값 검증 (데이터 형식 오류는 재시도로 복구 불가 → ack)
+    # 3. monthlyIncome 검증
     monthly_income = data.get("monthlyIncome")
     if monthly_income is not None:
         try:
@@ -56,19 +38,18 @@ async def handle_onboarding_event(msg):
             if monthly_income < 0:
                 raise ValueError("음수 월급")
         except (TypeError, ValueError) as e:
-            logger.error(f"[ProfileConsumer] monthlyIncome 형식 오류 - value={monthly_income}, error={e}")
-            await msg.ack()
-            return
+            logger.error(f"[ProfileConsumer] monthlyIncome 형식 오류 - error={e}")
+            raise
 
-    # 5. birth 파싱 (실패해도 저장 진행, birth만 None으로)
+    # 4. birth 파싱
     birth = None
     if data.get("birth"):
         try:
             birth = datetime.fromisoformat(data["birth"]).date()
         except Exception as e:
-            logger.warning(f"[ProfileConsumer] birth 파싱 실패 - birth={data.get('birth')}, error={e}")
+            logger.warning(f"[ProfileConsumer] birth 파싱 실패 - error={e}")
 
-    # 6. DB 저장 (upsert)
+    # 5. DB 저장 (upsert)
     db: Session = SessionLocal()
     try:
         existing = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
@@ -77,7 +58,7 @@ async def handle_onboarding_event(msg):
             existing.birth          = birth
             existing.sex            = data.get("sex")
             existing.monthly_income = monthly_income
-            logger.info(f"[ProfileConsumer] 유저 프로필 업데이트 - user_id={user_id}")
+            logger.info(f"[ProfileConsumer] 유저 프로필 업데이트 완료")
         else:
             profile = UserProfile(
                 user_id        = user_id,
@@ -86,14 +67,13 @@ async def handle_onboarding_event(msg):
                 monthly_income = monthly_income,
             )
             db.add(profile)
-            logger.info(f"[ProfileConsumer] 유저 프로필 신규 저장 - user_id={user_id}")
+            logger.info(f"[ProfileConsumer] 유저 프로필 신규 저장 완료")
 
         db.commit()
-        await msg.ack()
 
     except Exception as e:
         db.rollback()
-        logger.error(f"[ProfileConsumer] DB 저장 실패 - user_id={user_id}, error={e}")
-        await msg.nak()  # DB 오류는 재시도
+        logger.error(f"[ProfileConsumer] DB 저장 실패 - error={e}")
+        raise
     finally:
         db.close()

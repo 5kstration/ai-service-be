@@ -8,12 +8,14 @@ from app.domain.report.service import ReportService
 from app.core.config.database import get_db
 from app.core.common.response import CommonResponse
 from app.core.middleware.auth import get_current_user
-
+from app.domain.report.schema import ReportResponse, PeersComparisonResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/report", tags=["AI Report"])
 
-
+# ======================================
+# AI 리포트 조회/생성 엔드포인트 추가
+# ======================================
 @router.get(
     "",
     response_model=CommonResponse[ReportResponse],
@@ -50,4 +52,46 @@ def get_report(
     logger.info(f"[ReportRouter] GET /api/ai/report - user_id={current_user}")
     service = ReportService(db)
     data = service.get_or_generate_report(current_user)
+    return CommonResponse.of(data)
+
+
+# ======================================
+# peers-comoprsion 엔드포인트 
+# ======================================
+
+
+@router.get(
+    "/peers-comparison",
+    response_model=CommonResponse[PeersComparisonResponse],
+    summary="또래 비교 조회",
+    description="""
+    카테고리별 나의 지출과 또래 평균을 비교합니다.
+ 
+    **또래 기준**
+    - 나이 ±3세 이내
+    - 이번 달 지출 데이터 있는 유저
+    - 5명 미만이면 빈 리스트 반환 (개인 특정 방지)
+ 
+    **diff_amount**
+    - 양수: 또래보다 초과 지출
+    - 음수: 또래보다 절약
+ 
+    **예외 케이스**
+    - 온보딩 정보 없음 → 빈 리스트
+    - 또래 5명 미만    → 빈 리스트
+    - DB 오류          → 500
+    """,
+    responses={
+        200: {"description": "조회 성공 (또래 부족 시 빈 리스트)"},
+        401: {"description": "인증 실패"},
+        500: {"description": "서버 오류"},
+    }
+)
+def get_peers_comparison(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    logger.info("[ReportRouter] GET /api/ai/report/peers-comparison")
+    service = ReportService(db)
+    data = service.get_peers_comparison(current_user)
     return CommonResponse.of(data)
