@@ -149,7 +149,35 @@ class BookmarkPolicyItem(BaseModel):
         from_attributes = True
         populate_by_name = True
 
+class BookmarkInsuranceItem(BaseModel):
+    recommend_id:   str
+    insurer:        str
+    insurance_name: str
+    top_benefit:    str
+    accent_color:   str
+    apply_url:      Optional[str] = None
+    is_bookmarked:  bool = True
+ 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+ 
+ 
+class BookmarkCardItem(BaseModel):
+    recommend_id:  str
+    company:       str
+    card_name:     str
+    top_benefit:   str
+    accent_color:  str
+    apply_url:     Optional[str] = None
+    is_bookmarked: bool = True
+ 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class BookmarkListResponse(BaseModel):
-    bookmarks:   List[BookmarkPolicyItem]
+    policies:    List[BookmarkPolicyItem]
+    insurances:  List[BookmarkInsuranceItem]
+    cards:       List[BookmarkCardItem]
     total_count: int

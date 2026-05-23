@@ -130,6 +130,7 @@ class RecommendRepository:
             logger.error(f"[RecommendRepository] 북마크 조회 실패 - error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
 
+
     def find_bookmarked_ids_by_type(self, user_id: str, target_type: str) -> set:
         try:
             results = (
@@ -145,7 +146,7 @@ class RecommendRepository:
         except SQLAlchemyError as e:
             self.db.rollback()
             logger.error(f"[RecommendRepository] 북마크 ID 목록 조회 실패 - error={e}")
-            return set()
+            raise BusinessException(ErrorCode.DB_ERROR)
 
     def save_bookmark(self, bookmark: Bookmark) -> Bookmark:
         try:
@@ -169,7 +170,7 @@ class RecommendRepository:
             raise BusinessException(ErrorCode.DB_ERROR)
 
     def find_bookmarked_policies(self, user_id: str):
-        """북마크한 정책 목록 (product 원본 조회)."""
+        """북마크한 정책 목록 """
         try:
             bookmarked_ids = self.find_bookmarked_ids_by_type(user_id, "Policy")
             if not bookmarked_ids:
@@ -184,3 +185,36 @@ class RecommendRepository:
             self.db.rollback()
             logger.error(f"[RecommendRepository] 북마크 정책 목록 조회 실패 - error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
+        
+    def find_bookmarked_insurances(self, user_id: str):
+        """북마크한 보험 목록."""
+        try:
+            bookmarked_ids = self.find_bookmarked_ids_by_type(user_id, "Insurance")
+            if not bookmarked_ids:
+                return []
+            return (
+                self.db.query(InsuranceProduct)
+                .filter(InsuranceProduct.key.in_(bookmarked_ids))
+                .all()
+            )
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"[RecommendRepository] 북마크 보험 목록 조회 실패 - error={e}")
+            raise BusinessException(ErrorCode.DB_ERROR)
+ 
+    def find_bookmarked_cards(self, user_id: str):
+        """북마크한 카드 목록."""
+        try:
+            bookmarked_ids = self.find_bookmarked_ids_by_type(user_id, "card")
+            if not bookmarked_ids:
+                return []
+            return (
+                self.db.query(CardProduct)
+                .filter(CardProduct.key.in_(bookmarked_ids))
+                .all()
+            )
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"[RecommendRepository] 북마크 카드 목록 조회 실패 - error={e}")
+            raise BusinessException(ErrorCode.DB_ERROR)
+ 

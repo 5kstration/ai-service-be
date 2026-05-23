@@ -133,10 +133,12 @@ def toggle_bookmark(
 # =============================================
 # 북마크한 혜택 목록
 # =============================================
+
 @router.get(
     "/bookmarks",
     response_model=CommonResponse[BookmarkListResponse],
     summary="북마크한 혜택 목록",
+    description="북마크한 정책/보험/카드를 모두 반환합니다.",
 )
 def get_bookmarks(
     db: Session = Depends(get_db),
@@ -144,5 +146,5 @@ def get_bookmarks(
 ):
     logger.info("[RecommendRouter] GET /bookmarks")
     service = RecommendService(db)
-    data = service.get_bookmarked_policies(current_user)
+    data = service.get_bookmarks(current_user)  # get_bookmarked_policies → get_bookmarks
     return CommonResponse.of(data)

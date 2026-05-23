@@ -13,7 +13,8 @@ from app.domain.recommend.schema import (
     InsuranceItem, InsuranceListResponse,
     CardItem, CardListResponse,
     BookmarkRequest, BookmarkResponse,
-    BookmarkPolicyItem, BookmarkListResponse,
+    BookmarkPolicyItem, BookmarkInsuranceItem, BookmarkCardItem,  
+    BookmarkListResponse,
     BenefitItem,
 )
 from app.core.error.exception import BusinessException
@@ -181,10 +182,14 @@ class RecommendService:
                 is_bookmarked = True,
             )
 
-    def get_bookmarked_policies(self, user_id: str) -> BookmarkListResponse:
-        items = self.repo.find_bookmarked_policies(user_id)
 
-        bookmarks = [
+    def get_bookmarks(self, user_id: str) -> BookmarkListResponse:
+        """북마크한 정책/보험/카드 전체 목록."""
+        policy_items    = self.repo.find_bookmarked_policies(user_id)
+        insurance_items = self.repo.find_bookmarked_insurances(user_id)
+        card_items      = self.repo.find_bookmarked_cards(user_id)
+ 
+        policies = [
             BookmarkPolicyItem(
                 policy_id      = item.key,
                 title          = item.policy_name or "",
@@ -196,10 +201,39 @@ class RecommendService:
                 tags           = _parse_tags(item.tags),
                 is_bookmarked  = True,
             )
-            for item in items
+            for item in policy_items
         ]
-
+ 
+        insurances = [
+            BookmarkInsuranceItem(
+                recommend_id   = item.key,
+                insurer        = item.insurer or "",
+                insurance_name = item.insurance_name or "",
+                top_benefit    = item.top_benefit or "",
+                accent_color   = item.accent_color or "#8B5CF6",
+                apply_url      = item.apply_url,
+                is_bookmarked  = True,
+            )
+            for item in insurance_items
+        ]
+ 
+        cards = [
+            BookmarkCardItem(
+                recommend_id  = item.key,
+                company       = item.company or "",
+                card_name     = item.card_name or "",
+                top_benefit   = item.top_benefit or "",
+                accent_color  = item.accent_color or "#3182F6",
+                apply_url     = item.apply_url,
+                is_bookmarked = True,
+            )
+            for item in card_items
+        ]
+ 
         return BookmarkListResponse(
-            bookmarks   = bookmarks,
-            total_count = len(bookmarks),
+            policies    = policies,
+            insurances  = insurances,
+            cards       = cards,
+            total_count = len(policies) + len(insurances) + len(cards),
         )
+ 
