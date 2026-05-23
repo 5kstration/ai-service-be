@@ -70,3 +70,45 @@ class RecommendRepository:
             self.db.rollback()
             logger.error(f"[RecommendRepository] 정책 추천 결과 조회 실패 - error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
+        
+        
+  # =============================================
+    # 보험
+    # =============================================
+ 
+    def find_insurances_by_user(self, user_id: str):
+        """유저 추천 보험 + 상품 원본 JOIN."""
+        try:
+            return (
+                self.db.query(RecommendInsurance, InsuranceProduct)
+                .join(InsuranceProduct, RecommendInsurance.insurance_product_id == InsuranceProduct.key)
+                .filter(RecommendInsurance.user_id == user_id)
+                .order_by(RecommendInsurance.match_score.desc())
+                .all()
+            )
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"[RecommendRepository] 보험 목록 조회 실패 - error={e}")
+            raise BusinessException(ErrorCode.DB_ERROR)
+ 
+    # =============================================
+    # 카드
+    # =============================================
+ 
+    def find_cards_by_user(self, user_id: str):
+        """유저 추천 카드 + 상품 원본 JOIN."""
+        try:
+            return (
+                self.db.query(RecommendCard, CardProduct)
+                .join(CardProduct, RecommendCard.card_product_id == CardProduct.key)
+                .filter(RecommendCard.user_id == user_id)
+                .order_by(RecommendCard.match_score.desc())
+                .all()
+            )
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"[RecommendRepository] 카드 목록 조회 실패 - error={e}")
+            raise BusinessException(ErrorCode.DB_ERROR)
+ 
+ 
+ 
