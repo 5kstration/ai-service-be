@@ -205,7 +205,7 @@ class RecommendRepository:
     def find_bookmarked_cards(self, user_id: str):
         """북마크한 카드 목록."""
         try:
-            bookmarked_ids = self.find_bookmarked_ids_by_type(user_id, "card")
+            bookmarked_ids = self.find_bookmarked_ids_by_type(user_id, "Card")
             if not bookmarked_ids:
                 return []
             return (
