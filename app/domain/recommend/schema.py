@@ -2,6 +2,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from typing import Literal
 
 
 class BenefitItem(BaseModel):
@@ -118,11 +119,12 @@ class CardListResponse(BaseModel):
 # PATCH /api/recommend/bookmark/patch
 # =============================================
 
+
 class BookmarkRequest(BaseModel):
-    category: str   # "policy", "insurance", "card"
+    category: Literal["policy", "insurance", "card"]
     id: str
-
-
+    action: Literal["set", "unset"]  
+    
 class BookmarkResponse(BaseModel):
     bookmark_id:   Optional[str] = None
     category:      str

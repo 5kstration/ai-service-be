@@ -152,22 +152,23 @@ class RecommendService:
             recommended_at = recommended_at,
             cards          = cards,
         )
-
+        
+        
     def toggle_bookmark(self, user_id: str, request: BookmarkRequest) -> BookmarkResponse:
         type_map = {"policy": "Policy", "insurance": "Insurance", "card": "card"}
-        target_type = type_map.get(request.category.lower(), request.category)
+        target_type = type_map[request.category]
 
         existing = self.repo.find_bookmark(user_id, target_type, request.id)
 
-        if existing:
-            self.repo.delete_bookmark(existing)
-            return BookmarkResponse(
-                bookmark_id   = None,
-                category      = request.category,
-                id            = request.id,
-                is_bookmarked = False,
-            )
-        else:
+        if request.action == "set":
+            # 이미 있으면 그대로 반환 (멱등)
+            if existing:
+                return BookmarkResponse(
+                    bookmark_id   = existing.bookmark_id,
+                    category      = request.category,
+                    id            = request.id,
+                    is_bookmarked = True,
+                )
             bookmark = Bookmark(
                 bookmark_id   = TSID.create(),
                 user_id       = user_id,
@@ -180,6 +181,22 @@ class RecommendService:
                 category      = request.category,
                 id            = request.id,
                 is_bookmarked = True,
+            )
+        else:  # unset
+            # 이미 없으면 그대로 반환 (멱등)
+            if not existing:
+                return BookmarkResponse(
+                    bookmark_id   = None,
+                    category      = request.category,
+                    id            = request.id,
+                    is_bookmarked = False,
+                )
+            self.repo.delete_bookmark(existing)
+            return BookmarkResponse(
+                bookmark_id   = None,
+                category      = request.category,
+                id            = request.id,
+                is_bookmarked = False,
             )
 
 
