@@ -152,3 +152,54 @@ class RecommendService:
             cards          = cards,
         )
 
+    def toggle_bookmark(self, user_id: str, request: BookmarkRequest) -> BookmarkResponse:
+        type_map = {"policy": "Policy", "insurance": "Insurance", "card": "card"}
+        target_type = type_map.get(request.category.lower(), request.category)
+
+        existing = self.repo.find_bookmark(user_id, target_type, request.id)
+
+        if existing:
+            self.repo.delete_bookmark(existing)
+            return BookmarkResponse(
+                bookmark_id   = None,
+                category      = request.category,
+                id            = request.id,
+                is_bookmarked = False,
+            )
+        else:
+            bookmark = Bookmark(
+                bookmark_id   = TSID.create(),
+                user_id       = user_id,
+                target_type   = target_type,
+                target_ref_id = request.id,
+            )
+            saved = self.repo.save_bookmark(bookmark)
+            return BookmarkResponse(
+                bookmark_id   = saved.bookmark_id,
+                category      = request.category,
+                id            = request.id,
+                is_bookmarked = True,
+            )
+
+    def get_bookmarked_policies(self, user_id: str) -> BookmarkListResponse:
+        items = self.repo.find_bookmarked_policies(user_id)
+
+        bookmarks = [
+            BookmarkPolicyItem(
+                policy_id      = item.key,
+                title          = item.policy_name or "",
+                org            = item.org or "",
+                category       = item.category or "",
+                category_color = item.category_color or "#3182F6",
+                deadline       = item.deadline or "",
+                dday           = item.dday or 0,
+                tags           = _parse_tags(item.tags),
+                is_bookmarked  = True,
+            )
+            for item in items
+        ]
+
+        return BookmarkListResponse(
+            bookmarks   = bookmarks,
+            total_count = len(bookmarks),
+        )
