@@ -66,3 +66,85 @@ def get_policy_detail(
     service = RecommendService(db)
     data = service.get_policy_detail(current_user, policy_id)
     return CommonResponse.of(data)
+
+
+# =============================================
+# 보험 추천 목록
+# =============================================
+@router.get(
+    "/insurances",
+    response_model=CommonResponse[InsuranceListResponse],
+    summary="보험 추천 목록",
+)
+def get_insurances(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    logger.info("[RecommendRouter] GET /insurances")
+    service = RecommendService(db)
+    data = service.get_insurances(current_user)
+    return CommonResponse.of(data)
+
+
+# =============================================
+# 카드 추천 목록
+# =============================================
+@router.get(
+    "/cards",
+    response_model=CommonResponse[CardListResponse],
+    summary="카드 추천 목록",
+)
+def get_cards(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    logger.info("[RecommendRouter] GET /cards")
+    service = RecommendService(db)
+    data = service.get_cards(current_user)
+    return CommonResponse.of(data)
+
+
+# =============================================
+# 북마크 설정/해제
+# =============================================
+@router.patch(
+    "/bookmark/patch",
+    response_model=CommonResponse[BookmarkResponse],
+    summary="북마크 설정/해제",
+    description="""
+    북마크 토글.
+    - 이미 북마크된 경우 → 해제
+    - 아닌 경우 → 설정
+
+    **category**: policy, insurance, card
+    """,
+)
+def toggle_bookmark(
+    request: BookmarkRequest,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    logger.info("[RecommendRouter] PATCH /bookmark/patch")
+    service = RecommendService(db)
+    data = service.toggle_bookmark(current_user, request)
+    return CommonResponse.of(data)
+
+
+# =============================================
+# 북마크한 혜택 목록
+# =============================================
+
+@router.get(
+    "/bookmarks",
+    response_model=CommonResponse[BookmarkListResponse],
+    summary="북마크한 혜택 목록",
+    description="북마크한 정책/보험/카드를 모두 반환합니다.",
+)
+def get_bookmarks(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    logger.info("[RecommendRouter] GET /bookmarks")
+    service = RecommendService(db)
+    data = service.get_bookmarks(current_user)  # get_bookmarked_policies → get_bookmarks
+    return CommonResponse.of(data)

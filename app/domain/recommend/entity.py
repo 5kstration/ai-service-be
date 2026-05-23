@@ -4,22 +4,18 @@ from sqlalchemy.sql import func
 from app.core.config.database import Base
 
 
-# =============================================
-# 상품 원본 테이블 (공통 데이터)
-# =============================================
-
 class PolicyProduct(Base):
-    """청년 정책 원본 데이터. 공공데이터에서 수집."""
+    """청년 정책 원본 데이터."""
     __tablename__ = "policy_product"
 
     key                  = Column(String(26),  primary_key=True, nullable=False)
     policy_name          = Column(String(255), nullable=True)
-    org                  = Column(String(255), nullable=True)   # 주관기관
-    category             = Column(String(100), nullable=True)   # 주거, 금융 등
+    org                  = Column(String(255), nullable=True)
+    category             = Column(String(100), nullable=True)
     category_color       = Column(String(20),  nullable=True)
-    deadline             = Column(String(50),  nullable=True)   # "2025.05.31"
+    deadline             = Column(String(50),  nullable=True)
     dday                 = Column(Integer,      nullable=True)
-    tags                 = Column(Text,         nullable=True)   # JSON 배열
+    tags                 = Column(Text,         nullable=True)
     core_benefit         = Column(String(255), nullable=True)
     description          = Column(Text,         nullable=True)
     age_min              = Column(Integer,      nullable=True)
@@ -34,14 +30,14 @@ class PolicyProduct(Base):
 
 
 class InsuranceProduct(Base):
-    """보험 상품 원본 데이터. 금감원 API에서 수집."""
+    """보험 상품 원본 데이터."""
     __tablename__ = "insurance_product"
 
     key            = Column(String(26),  primary_key=True, nullable=False)
-    insurer        = Column(String(255), nullable=True)   # 보험사
+    insurer        = Column(String(255), nullable=True)
     insurance_name = Column(String(255), nullable=True)
     top_benefit    = Column(String(255), nullable=True)
-    benefits       = Column(Text,        nullable=True)   # JSON [{label, value}]
+    benefits       = Column(Text,        nullable=True)
     apply_url      = Column(Text,        nullable=True)
     accent_color   = Column(String(20),  nullable=True)
     created_at     = Column(DateTime,    nullable=False, server_default=func.now())
@@ -53,19 +49,15 @@ class CardProduct(Base):
     __tablename__ = "card_product"
 
     key          = Column(String(26),  primary_key=True, nullable=False)
-    company      = Column(String(255), nullable=True)   # 카드사
+    company      = Column(String(255), nullable=True)
     card_name    = Column(String(255), nullable=True)
     top_benefit  = Column(String(255), nullable=True)
-    benefits     = Column(Text,        nullable=True)   # JSON [{label, value}]
+    benefits     = Column(Text,        nullable=True)
     apply_url    = Column(Text,        nullable=True)
     accent_color = Column(String(20),  nullable=True)
     created_at   = Column(DateTime,    nullable=False, server_default=func.now())
     updated_at   = Column(DateTime,    nullable=False, server_default=func.now(), onupdate=func.now())
 
-
-# =============================================
-# 유저별 추천 결과 테이블 (유저마다 다른 데이터)
-# =============================================
 
 class RecommendPolicy(Base):
     """유저별 AI 정책 추천 결과."""
@@ -74,8 +66,7 @@ class RecommendPolicy(Base):
     key               = Column(String(26), primary_key=True, nullable=False)
     user_id           = Column(String(26), nullable=False)
     policy_product_id = Column(String(26), ForeignKey("policy_product.key"), nullable=False)
-    match_score       = Column(Integer,    nullable=True)
-    ai_reason         = Column(Text,       nullable=True)  # 유저별 추천 사유
+    ai_reason         = Column(Text,       nullable=True)
     created_at        = Column(DateTime,   nullable=False, server_default=func.now())
 
 
@@ -86,7 +77,6 @@ class RecommendInsurance(Base):
     key                  = Column(String(26), primary_key=True, nullable=False)
     user_id              = Column(String(26), nullable=False)
     insurance_product_id = Column(String(26), ForeignKey("insurance_product.key"), nullable=False)
-    match_score          = Column(Integer,    nullable=True)
     ai_reason            = Column(Text,       nullable=True)
     created_at           = Column(DateTime,   nullable=False, server_default=func.now())
 
@@ -98,14 +88,9 @@ class RecommendCard(Base):
     key             = Column(String(26), primary_key=True, nullable=False)
     user_id         = Column(String(26), nullable=False)
     card_product_id = Column(String(26), ForeignKey("card_product.key"), nullable=False)
-    match_score     = Column(Integer,    nullable=True)
     ai_reason       = Column(Text,       nullable=True)
     created_at      = Column(DateTime,   nullable=False, server_default=func.now())
 
-
-# =============================================
-# 북마크
-# =============================================
 
 class Bookmark(Base):
     """북마크 (정책/보험/카드 공통)."""
@@ -113,8 +98,8 @@ class Bookmark(Base):
 
     bookmark_id   = Column(String(26), primary_key=True, nullable=False)
     user_id       = Column(String(26), nullable=False)
-    target_type   = Column(String(20), nullable=False)   # Policy, Insurance, card
-    target_ref_id = Column(String(26), nullable=False)   # product 테이블의 key
+    target_type   = Column(String(20), nullable=False)
+    target_ref_id = Column(String(26), nullable=False)
     remind_at     = Column(DateTime,   nullable=True)
     is_reminded   = Column(Boolean,    nullable=True, default=False)
     created_at    = Column(DateTime,   nullable=False, server_default=func.now())

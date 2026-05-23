@@ -2,11 +2,8 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from typing import Literal
 
-
-# =============================================
-# 공통
-# =============================================
 
 class BenefitItem(BaseModel):
     label: str
@@ -15,7 +12,6 @@ class BenefitItem(BaseModel):
 
 # =============================================
 # GET /api/recommend/policies
-# 청년 정책 추천 목록
 # =============================================
 
 class PolicyListItem(BaseModel):
@@ -42,7 +38,6 @@ class PolicyListResponse(BaseModel):
 
 # =============================================
 # GET /api/recommend/policies/{policyId}
-# 청년 정책 상세
 # =============================================
 
 class PolicyDetailResponse(BaseModel):
@@ -70,3 +65,121 @@ class PolicyDetailResponse(BaseModel):
         populate_by_name = True
 
 
+# =============================================
+# GET /api/recommend/insurances
+# =============================================
+
+class InsuranceItem(BaseModel):
+    recommend_id:   str
+    insurer:        str
+    insurance_name: str
+    top_benefit:    str
+    benefits:       List[BenefitItem]
+    match_reason:   str
+    accent_color:   str
+    apply_url:      Optional[str] = None
+    is_bookmarked:  bool = False
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class InsuranceListResponse(BaseModel):
+    recommended_at: Optional[datetime] = None
+    insurances:     List[InsuranceItem]
+
+
+# =============================================
+# GET /api/recommend/cards
+# =============================================
+
+class CardItem(BaseModel):
+    recommend_id:  str
+    company:       str
+    card_name:     str
+    top_benefit:   str
+    benefits:      List[BenefitItem]
+    match_reason:  str
+    accent_color:  str
+    apply_url:     Optional[str] = None
+    is_bookmarked: bool = False
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class CardListResponse(BaseModel):
+    recommended_at: Optional[datetime] = None
+    cards:          List[CardItem]
+
+
+# =============================================
+# PATCH /api/recommend/bookmark/patch
+# =============================================
+
+
+class BookmarkRequest(BaseModel):
+    category: Literal["policy", "insurance", "card"]
+    id: str
+    action: Literal["set", "unset"]  
+    
+class BookmarkResponse(BaseModel):
+    bookmark_id:   Optional[str] = None
+    category:      str
+    id:            str
+    is_bookmarked: bool
+
+
+# =============================================
+# GET /api/recommend/bookmarks
+# =============================================
+
+class BookmarkPolicyItem(BaseModel):
+    policy_id:      str
+    title:          str
+    org:            str
+    category:       str
+    category_color: str
+    deadline:       str
+    dday:           int
+    tags:           List[str]
+    is_bookmarked:  bool = True
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class BookmarkInsuranceItem(BaseModel):
+    recommend_id:   str
+    insurer:        str
+    insurance_name: str
+    top_benefit:    str
+    accent_color:   str
+    apply_url:      Optional[str] = None
+    is_bookmarked:  bool = True
+ 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+ 
+ 
+class BookmarkCardItem(BaseModel):
+    recommend_id:  str
+    company:       str
+    card_name:     str
+    top_benefit:   str
+    accent_color:  str
+    apply_url:     Optional[str] = None
+    is_bookmarked: bool = True
+ 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class BookmarkListResponse(BaseModel):
+    policies:    List[BookmarkPolicyItem]
+    insurances:  List[BookmarkInsuranceItem]
+    cards:       List[BookmarkCardItem]
+    total_count: int
