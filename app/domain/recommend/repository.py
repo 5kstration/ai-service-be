@@ -81,13 +81,14 @@ class RecommendRepository:
                 self.db.query(RecommendInsurance, InsuranceProduct)
                 .join(InsuranceProduct, RecommendInsurance.insurance_product_id == InsuranceProduct.key)
                 .filter(RecommendInsurance.user_id == user_id)
-                .order_by(RecommendInsurance.match_score.desc())
+                .order_by(RecommendInsurance.created_at.desc())  
                 .all()
             )
         except SQLAlchemyError as e:
             self.db.rollback()
             logger.error(f"[RecommendRepository] 보험 목록 조회 실패 - error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
+
 
     # =============================================
     # 카드
@@ -100,14 +101,14 @@ class RecommendRepository:
                 self.db.query(RecommendCard, CardProduct)
                 .join(CardProduct, RecommendCard.card_product_id == CardProduct.key)
                 .filter(RecommendCard.user_id == user_id)
-                .order_by(RecommendCard.match_score.desc())
+                .order_by(RecommendCard.created_at.desc()) 
                 .all()
             )
         except SQLAlchemyError as e:
             self.db.rollback()
             logger.error(f"[RecommendRepository] 카드 목록 조회 실패 - error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
-
+        
     # =============================================
     # 북마크
     # =============================================
