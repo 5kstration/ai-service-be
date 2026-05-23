@@ -10,18 +10,20 @@ logger = logging.getLogger(__name__)
 
 _sqs_client = None
 
-
+_consumer_task = None
 
 
 def get_sqs_client():
     global _sqs_client
     if _sqs_client is None:
         try:
-            kwargs = dict(
-                region_name           = settings.AWS_REGION,
-                aws_access_key_id     = settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key = settings.AWS_SECRET_ACCESS_KEY,
-            )
+            kwargs = {
+                    "region_name": settings.AWS_REGION,
+                }
+            if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+                kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
+                kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+
             # 로컬 환경에서만 endpoint_url 추가
             if settings.SQS_ENDPOINT_URL:
                 kwargs["endpoint_url"] = settings.SQS_ENDPOINT_URL
@@ -65,10 +67,15 @@ async def start_consumers():
     if not sqs:
         logger.warning("[SQS] 클라이언트 없음 - consumer 등록 스킵")
         return
+    if not settings.SQS_QUEUE_URL:
+        logger.warning("[SQS] SQS_QUEUE_URL 미설정 - consumer 등록 스킵")
+        return
 
     logger.info(f"[SQS] consumer 시작 - queue={settings.SQS_QUEUE_URL}")
-    asyncio.create_task(_poll_messages(sqs))
-
+    if _consumer_task and not _consumer_task.done():
+        logger.info("[SQS] consumer 이미 실행 중 - 중복 시작 스킵")
+        return
+    _consumer_task = asyncio.create_task(_poll_messages(sqs))
 
 async def _poll_messages(sqs):
     """
