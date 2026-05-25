@@ -27,6 +27,7 @@ class PolicyProduct(Base):
     apply_url            = Column(Text,         nullable=True)
     created_at           = Column(DateTime,     nullable=False, server_default=func.now())
     updated_at           = Column(DateTime,     nullable=False, server_default=func.now(), onupdate=func.now())
+    external_id = Column(String(255), nullable=True, unique=True)
 
 
 class InsuranceProduct(Base):
@@ -42,6 +43,7 @@ class InsuranceProduct(Base):
     accent_color   = Column(String(20),  nullable=True)
     created_at     = Column(DateTime,    nullable=False, server_default=func.now())
     updated_at     = Column(DateTime,    nullable=False, server_default=func.now(), onupdate=func.now())
+    external_id = Column(String(255), nullable=True, unique=True)
 
 
 class CardProduct(Base):
@@ -57,7 +59,7 @@ class CardProduct(Base):
     accent_color = Column(String(20),  nullable=True)
     created_at   = Column(DateTime,    nullable=False, server_default=func.now())
     updated_at   = Column(DateTime,    nullable=False, server_default=func.now(), onupdate=func.now())
-
+    external_id = Column(String(255), nullable=True, unique=True)
 
 class RecommendPolicy(Base):
     """유저별 AI 정책 추천 결과."""

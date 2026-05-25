@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     SQS_QUEUE_URL: str = ""
     SQS_ENDPOINT_URL: str = ""  # 로컬: http://localhost:4566, 운영: 빈값
     
+    #raw
+    RAW_EXTERNAL_BASE_URL: str = "http://온프렘서버:8081"
+
+    
     class Config:
         env_file = ".env"
         extra = "ignore"  
