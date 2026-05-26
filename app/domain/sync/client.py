@@ -37,9 +37,11 @@ class RawExternalClient:
                 payload["sourceCode"] = source_code
 
             with httpx.Client(timeout=30) as client:
-                response = client.get(
-                    f"{self.base_url}/internal/v1/raw-externals",
-                    json=payload,
+                response = client.request(
+                    method  = "GET",
+                    url     = f"{self.base_url}/internal/v1/raw-externals",
+                    json    = payload,
+                    headers = {"Content-Type": "application/json"},
                 )
                 response.raise_for_status()
                 return response.json()
