@@ -71,8 +71,13 @@ class SyncService:
                 except IntegrityError:
                     skipped += 1
                     logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
+                except (TypeError, ValueError, AttributeError) as e:
+                    logger.error(
+                        f"[SyncService] 카드 payload 매핑 실패 - external_id={item.get('externalId')}, error={e}")
+                    failed += 1
                 except SQLAlchemyError as e:
-                    logger.error(f"[SyncService] 카드 저장 실패 - external_id={item.get('externalId')}, error={e}")
+                    logger.error(
+                        f"[SyncService] 카드 저장 실패 - external_id={item.get('externalId')}, error={e}")
                     failed += 1
 
             if data.get("last", True):
@@ -131,11 +136,16 @@ class SyncService:
                             accent_color   = "#8B5CF6",
                         ))
                     saved += 1
-                except IntegrityError:
-                    skipped += 1  
+              except IntegrityError:
+                    skipped += 1
                     logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
+                except (TypeError, ValueError, AttributeError) as e:
+                    logger.error(
+                        f"[SyncService] 보험 payload 매핑 실패 - external_id={item.get('externalId')}, error={e}")
+                    failed += 1
                 except SQLAlchemyError as e:
-                    logger.error(f"[SyncService] 보험 저장 실패 - external_id={item.get('externalId')}, error={e}")
+                    logger.error(
+                        f"[SyncService] 보험 저장 실패 - external_id={item.get('externalId')}, error={e}")
                     failed += 1
 
             if data.get("last", True):
@@ -204,12 +214,16 @@ class SyncService:
                             application_period = f"{raw.get('grntFrom', '')} ~ {raw.get('grntEnd', '')}",
                         ))
                     saved += 1
-
-                except IntegrityError:
-                    skipped += 1  
+              except IntegrityError:
+                    skipped += 1
                     logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
+                except (TypeError, ValueError, AttributeError) as e:
+                    logger.error(
+                        f"[SyncService] 정책 payload 매핑 실패 - external_id={item.get('externalId')}, error={e}")
+                    failed += 1
                 except SQLAlchemyError as e:
-                    logger.error(f"[SyncService] 정책 저장 실패 - external_id={item.get('externalId')}, error={e}")
+                    logger.error(
+                        f"[SyncService] 정책 저장 실패 - external_id={item.get('externalId')}, error={e}")
                     failed += 1
 
             if data.get("last", True):
