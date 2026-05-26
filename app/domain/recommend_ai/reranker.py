@@ -20,10 +20,9 @@ class RerankerClient:
     def rerank(self, query, documents, top_n=7):
         if not documents:
             return []
-        if len(documents) <= top_n:
-            return list(range(len(documents)))
+        top_n = min(top_n, len(documents))
         if self._model is None:
-            return list(range(min(top_n, len(documents))))
+            return list(range(top_n))
 
         try:
             pairs  = [[query, doc] for doc in documents]
@@ -43,6 +42,6 @@ class RerankerClient:
 
         except Exception as e:
             logger.warning(f"[Reranker] 실패 - fallback. error={e}")
-            return list(range(min(top_n, len(documents))))
+            return list(range(top_n))
 
 reranker_client = RerankerClient()
