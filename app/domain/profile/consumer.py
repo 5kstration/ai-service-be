@@ -23,7 +23,7 @@ async def handle_onboarding_event(body: str):
     # 2. userId 검증
     user_id = data.get("userId")
     if not user_id or not isinstance(user_id, str) or not user_id.strip():
-        logger.error(f"[ProfileConsumer] userId 누락")
+        logger.error("[ProfileConsumer] userId 누락")
         raise ValueError("userId 누락")
 
     # 3. monthlyIncome 검증

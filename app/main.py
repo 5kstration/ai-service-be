@@ -40,4 +40,5 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     from app.core.config.scheduler import scheduler
-    scheduler.shutdown()
+    if scheduler.running:
+        scheduler.shutdown(wait=False)

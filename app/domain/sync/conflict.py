@@ -20,9 +20,17 @@ def detect_conflict(p1: PolicyProduct, p2: PolicyProduct) -> bool:
             return True
 
     # 2. 나이 범위 겹침 + 동일 카테고리
-    if p1.age_min and p1.age_max and p2.age_min and p2.age_max:
+    if (
+        p1.age_min is not None and p1.age_max is not None and
+        p2.age_min is not None and p2.age_max is not None
+    ):
         age_overlap = (p1.age_min <= p2.age_max and p2.age_min <= p1.age_max)
-        if age_overlap and p1.category == p2.category:
+        if (
+            age_overlap and
+            p1.category is not None and
+            p2.category is not None and
+            p1.category == p2.category
+        ):
             return True
 
     # 3. 명시적 중복 불가 키워드
@@ -61,5 +69,10 @@ def update_conflict_ids(db, policies: list[PolicyProduct]) -> None:
             conflict_map.get(policy.key, []),
             ensure_ascii=False,
         )
-    db.commit()
-    logger.info(f"[Conflict] conflict 자동 계산 완료 - 총 {len(policies)}개 정책")
+    try:
+        db.commit()
+        logger.info(f"[Conflict] conflict 자동 계산 완료 - 총 {len(policies)}개 정책")
+    except Exception:
+        db.rollback()
+        logger.exception("[Conflict] conflict_policy_ids 업데이트 중 DB 커밋 실패")
+        raise

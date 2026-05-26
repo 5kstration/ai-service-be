@@ -48,23 +48,24 @@ def embed_all_products():
     try:
         # 기존 임베딩 전체 삭제 후 재생성
         vdb.query(ProductEmbedding).delete()
-        vdb.commit()
 
         saved = 0
 
         # 카드 임베딩
         cards = db.query(CardProduct).all()
         for card in cards:
+            text = _card_to_text(card)
+            embedding = bedrock_client.embed(text)
             try:
-                text      = _card_to_text(card)
-                embedding = bedrock_client.embed(text)
-                vdb.add(ProductEmbedding(
-                    id           = TSID.create(),
-                    product_id   = card.key,
-                    product_type = "card",
-                    embedding    = embedding,
-                    content      = text,
-                ))
+                with vdb.begin_nested():
+                    vdb.add(ProductEmbedding(
+                        id           = TSID.create(),
+                        product_id   = card.key,
+                        product_type = "card",
+                        embedding    = embedding,
+                        content      = text,
+                    ))
+                    vdb.flush()
                 saved += 1
             except Exception as e:
                 logger.error(f"[EmbedService] 카드 임베딩 실패 - key={card.key}, error={e}")
@@ -105,6 +106,10 @@ def embed_all_products():
 
         vdb.commit()
         logger.info(f"[EmbedService] 임베딩 완료 - total={saved}개")
+    except Exception:
+        vdb.rollback()
+        logger.error(f"[EmbedService] 임베딩 저장 실패")
+        raise
 
     finally:
         db.close()

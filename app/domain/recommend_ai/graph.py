@@ -63,7 +63,12 @@ def build_recommend_graph():
         "conflict", _has_error,
         {"save": "save", "continue": "llm"},
     )
-    graph.add_edge("llm",  "save")
+    graph.add_conditional_edges(
+        "llm", _has_error,
+        {"save": END, "continue": "save"},  # 에러 시 저장 스킵
+    )
+
+
     graph.add_edge("save", END)
 
     return graph.compile()

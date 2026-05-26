@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 MAX_RECOMMEND = 5
 VECTOR_CANDIDATES = 20  # 벡터 검색 후보 수
+RERANK_TOP_N      = 7   # 리랭커 통과 후 LLM에 넘길 수
 
 
 # =============================================
@@ -86,9 +87,13 @@ def embed_node(state: RecommendState) -> dict:
         f"{s['category']} {s['amount']:,}원"
         for s in state["monthly_summary"]
     ])
+    age = state['user_age'] or 0
+    sex = state['user_sex'] or '미입력'
+    income = state['user_income'] or 0
+
     text = (
-        f"나이 {state['user_age']}세 {state['user_sex']}. "
-        f"월급 {state['user_income']:,}원. "
+        f"나이 {age}세 {sex}. "
+        f"월급 {income:,}원. "
         f"이번 달 지출: {summary_text}"
     )
 
@@ -103,8 +108,6 @@ def embed_node(state: RecommendState) -> dict:
 # =============================================
 # 3. 벡터 검색 노드
 # =============================================
-VECTOR_CANDIDATES = 20  # 리랭커가 받을 후보 수
-RERANK_TOP_N      = 7   # 리랭커 통과 후 LLM에 넘길 수
  
  
 def vector_search_node(state: RecommendState) -> dict:
@@ -234,9 +237,11 @@ def filter_node(state: RecommendState) -> dict:
         age_max = policy.get("age_max")
 
         # 나이 조건 체크
-        if age_min and age_max:
-            if not (age_min <= user_age <= age_max):
-                continue
+        if age_min is not None and user_age < age_min:
+            continue
+        if age_max is not None and user_age > age_max:
+            continue
+
 
         filtered.append(policy)
 
