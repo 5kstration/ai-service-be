@@ -7,17 +7,23 @@ logger = logging.getLogger(__name__)
 
 class RerankerClient:
     def __init__(self):
-        # 한국어 지원 cross-encoder
-        self._model = CrossEncoder("bongsoo/klue-cross-encoder-v1")
-        self._model.predict([["warmup", "warmup"]], show_progress_bar=False)
+        self._model = None
+        try:
+            model = CrossEncoder("bongsoo/klue-cross-encoder-v1")
+            model.predict([["warmup", "warmup"]], show_progress_bar=False)
+            self._model = model
+            logger.info("[Reranker] 모델 로드 완료")
+        except Exception as e:
+            logger.warning(f"[Reranker] 모델 초기화 실패 - fallback only. error={e}")
 
-        logger.info("[Reranker] 모델 로드 완료")
 
     def rerank(self, query, documents, top_n=7):
         if not documents:
             return []
         if len(documents) <= top_n:
             return list(range(len(documents)))
+        if self._model is None:
+            return list(range(min(top_n, len(documents))))
 
         try:
             pairs  = [[query, doc] for doc in documents]

@@ -6,3 +6,5 @@ venv/
 app/core/client/llm_benchmark.py
 benchmark_result.json
 docker-compose.yml
+app/core/client/eval.py
+eval_result.json
