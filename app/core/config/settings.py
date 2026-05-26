@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     
     #raw
     RAW_EXTERNAL_BASE_URL: str = "http://온프렘서버:8081"
-
+    # Bedrock (추천 파이프라인용)
+    BEDROCK_EMBED_MODEL: str = "amazon.titan-embed-text-v2:0"
+    BEDROCK_LLM_MODEL:   str = "anthropic.claude-haiku-4-5-20251001:0"
     
     class Config:
         env_file = ".env"

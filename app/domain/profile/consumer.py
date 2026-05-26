@@ -1,10 +1,11 @@
 # app/domain/profile/consumer.py
+# SQS 온보딩 이벤트 수신 → user_profile 저장 → 추천 파이프라인 실행
+
 import json
 import logging
 from datetime import datetime
 
 from sqlalchemy.orm import Session
-
 from app.domain.profile.entity import UserProfile
 from app.core.config.database import SessionLocal
 
@@ -12,11 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_onboarding_event(body: str):
-    """
-    SQS 온보딩 이벤트 메시지 처리.
-    auth-service가 SQS에 직접 발행한 메시지를 수신.
-    """
-
     # 1. JSON 파싱
     try:
         data = json.loads(body)
@@ -27,7 +23,7 @@ async def handle_onboarding_event(body: str):
     # 2. userId 검증
     user_id = data.get("userId")
     if not user_id or not isinstance(user_id, str) or not user_id.strip():
-        logger.error(f"[ProfileConsumer] userId 누락 또는 유효하지 않음")
+        logger.error(f"[ProfileConsumer] userId 누락")
         raise ValueError("userId 누락")
 
     # 3. monthlyIncome 검증
@@ -52,7 +48,9 @@ async def handle_onboarding_event(body: str):
     # 5. DB 저장 (upsert)
     db: Session = SessionLocal()
     try:
-        existing = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+        existing = db.query(UserProfile).filter(
+            UserProfile.user_id == user_id
+        ).first()
 
         if existing:
             existing.birth          = birth
@@ -60,13 +58,12 @@ async def handle_onboarding_event(body: str):
             existing.monthly_income = monthly_income
             logger.info(f"[ProfileConsumer] 유저 프로필 업데이트 완료")
         else:
-            profile = UserProfile(
+            db.add(UserProfile(
                 user_id        = user_id,
                 birth          = birth,
                 sex            = data.get("sex"),
                 monthly_income = monthly_income,
-            )
-            db.add(profile)
+            ))
             logger.info(f"[ProfileConsumer] 유저 프로필 신규 저장 완료")
 
         db.commit()
@@ -77,3 +74,12 @@ async def handle_onboarding_event(body: str):
         raise
     finally:
         db.close()
+
+    # 6. 추천 파이프라인 실행 (신규 유저)
+    try:
+        from app.domain.recommend_ai.graph import run_recommend_pipeline
+        await run_recommend_pipeline(user_id)
+        logger.info(f"[ProfileConsumer] 추천 파이프라인 완료 - user_id={user_id}")
+    except Exception as e:
+        # 추천 실패해도 온보딩 자체는 성공 처리
+        logger.error(f"[ProfileConsumer] 추천 파이프라인 실패 - user_id={user_id}, error={e}")
