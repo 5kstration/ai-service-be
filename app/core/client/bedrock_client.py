@@ -28,8 +28,7 @@ class BedrockClient:
                 accept      = "application/json",
                 body        = json.dumps({
                     "inputText":  text,
-                    "dimensions": 1536,
-                    "normalize":  True,
+
                 }),
             )
             result = json.loads(response["body"].read())

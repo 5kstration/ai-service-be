@@ -201,6 +201,7 @@ def conflict_node(state: RecommendState) -> dict:
 # =============================================
 # 6. LLM 추천 노드
 # =============================================
+
 def llm_recommend_node(state: RecommendState) -> dict:
     """Bedrock Claude → 최종 추천 5개 + 추천 사유 생성."""
     if state.get("error"):
@@ -209,53 +210,80 @@ def llm_recommend_node(state: RecommendState) -> dict:
     db: Session = SessionLocal()
     try:
         # conflict 텍스트 생성
-        conflict_text = ""
+        conflict_text = "없음"
         if state["conflict_info"]:
             lines = []
             for pid, cids in state["conflict_info"].items():
                 lines.append(f"- {pid}는 {', '.join(cids)}와 중복 신청 불가")
             conflict_text = "\n".join(lines)
 
-        summary_text = ", ".join([
-            f"{s['category']} {s['amount']:,}원"
-            for s in state["monthly_summary"]
-        ])
+        # 소비 패턴 텍스트 (TOP 3 강조)
+        sorted_summary = sorted(
+            state["monthly_summary"],
+            key=lambda x: x["amount"],
+            reverse=True
+        )
+        top3 = sorted_summary[:3]
+        total = sum(s["amount"] for s in state["monthly_summary"])
 
-        prompt = f"""
-당신은 청년 금융 전문가입니다. 아래 유저 정보와 후보 상품을 보고 각각 최대 {MAX_RECOMMEND}개를 추천해주세요.
+        summary_lines = []
+        for s in sorted_summary:
+            ratio = int(s["amount"] / total * 100) if total > 0 else 0
+            summary_lines.append(f"  - {s['category']}: {s['amount']:,}원 ({ratio}%)")
+        summary_text = "\n".join(summary_lines)
 
-[유저 정보]
-- 나이: {state['user_age']}세
-- 성별: {state['user_sex']}
-- 월급: {state['user_income']:,}원
-- 이번 달 지출: {summary_text}
+        top3_text = ", ".join([f"{s['category']}({s['amount']:,}원)" for s in top3])
 
-[후보 카드 목록]
+        prompt = f"""당신은 청년 금융 전문가입니다. 아래 유저 정보와 소비 패턴을 꼼꼼히 분석하여 가장 적합한 금융 상품을 추천해주세요.
+
+## 유저 프로필
+- 나이: {state['user_age']}세 / 성별: {state['user_sex']}
+- 월 소득: {state['user_income']:,}원
+- 이번 달 총 지출: {total:,}원 (소득 대비 {int(total/state['user_income']*100) if state['user_income'] else 0}%)
+
+## 이번 달 소비 패턴
+{summary_text}
+
+## TOP 3 지출 카테고리
+{top3_text}
+
+## 후보 카드 목록
 {json.dumps(state['card_candidates'], ensure_ascii=False, indent=2)}
 
-[후보 보험 목록]
+## 후보 보험 목록
 {json.dumps(state['insurance_candidates'], ensure_ascii=False, indent=2)}
 
-[후보 정책 목록]
+## 후보 정책 목록
 {json.dumps(state['filtered_policies'], ensure_ascii=False, indent=2)}
 
-[정책 중복 불가 정보]
-{conflict_text if conflict_text else "없음"}
+## 정책 중복 불가 정보
+{conflict_text}
 
-규칙:
+## 추천 규칙
 1. 카드/보험/정책 각각 최대 {MAX_RECOMMEND}개 선택
-2. 추천 사유는 유저의 소비 패턴과 연결해서 한 문장으로
-3. 중복 불가 정책은 추천 사유에 "이 정책은 [정책명]과 중복 신청이 불가합니다" 명시
-4. 중복 가능 정책은 "이 정책은 [정책명]과 함께 신청 가능합니다" 명시
-5. 금융소비자보호법을 회피하기 위해 상품 설명을 그대로 쓰지 말고, 유저 정보와 연결해서 재구성 및 토스나 카카오 뱅크 처럼 돌려서 표현
+2. 추천 사유 작성 규칙:
+   - 반드시 유저의 실제 소비 데이터(금액, 카테고리)를 언급할 것
+   - 예시: "이번 달 식비 {top3[0]['amount']:,}원을 지출했는데, 이 카드로 매달 약 XX원 절약 가능해요"
+   - 친근하고 응원하는 톤으로 작성 (딱딱한 설명 금지)
+   - 1~2문장으로 간결하게
+   - "~할 것 같습니다" 표현 절대 금지 → "~할 수 있어요", "~에 딱 맞아요" 등 사용
+3. 보험은 유저 나이와 성별, 소비 패턴에서 유추한 라이프스타일 기반으로 추천
+4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
+5. 중복 불가 정책이 있으면 추천 사유 마지막에 "단, [정책명]과 중복 신청은 불가해요" 명시
 
-아래 JSON 형식으로만 응답하세요:
+## 응답 형식 (JSON만, 다른 텍스트 없이)
 {{
-  "cards": [{{"product_id": "...", "reason": "..."}}],
-  "insurances": [{{"product_id": "...", "reason": "..."}}],
-  "policies": [{{"product_id": "...", "reason": "..."}}]
-}}
-"""
+  "cards": [
+    {{"product_id": "상품key", "reason": "추천 사유"}}
+  ],
+  "insurances": [
+    {{"product_id": "상품key", "reason": "추천 사유"}}
+  ],
+  "policies": [
+    {{"product_id": "상품key", "reason": "추천 사유"}}
+  ]
+}}"""
+
         response_text = bedrock_client.recommend(prompt)
 
         # JSON 파싱
@@ -282,7 +310,6 @@ def llm_recommend_node(state: RecommendState) -> dict:
         return {"error": str(e)}
     finally:
         db.close()
-
 
 # =============================================
 # 7. 저장 노드

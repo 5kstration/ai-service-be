@@ -28,6 +28,7 @@ class PolicyProduct(Base):
     created_at           = Column(DateTime,     nullable=False, server_default=func.now())
     updated_at           = Column(DateTime,     nullable=False, server_default=func.now(), onupdate=func.now())
     external_id = Column(String(255), nullable=True, unique=True)
+    conflict_policy_ids = Column(Text, nullable=True, default='[]')
 
 
 class InsuranceProduct(Base):

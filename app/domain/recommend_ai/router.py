@@ -10,7 +10,7 @@ from app.core.common.response import CommonResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/internal/v1/recommend", tags=["Recommend AI"])
+router = APIRouter(prefix="/internal/recommend", tags=["Recommend AI"])
 
 
 @router.post(
