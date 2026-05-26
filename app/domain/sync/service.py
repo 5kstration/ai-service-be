@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.domain.recommend.entity import CardProduct, InsuranceProduct, PolicyProduct
 from app.domain.sync.client import raw_external_client
 from app.core.utils.tsid import TSID
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -53,20 +54,24 @@ class SyncService:
                         [{"label": f"혜택 {i+1}", "value": b} for i, b in enumerate(benefit_texts)],
                         ensure_ascii=False,
                     )
-
-                    self.db.add(CardProduct(
-                        key          = TSID.create(),
-                        external_id  = external_id,
-                        company      = raw.get("cardCompany") or raw.get("company", ""),
-                        card_name    = raw.get("cardName", ""),
-                        top_benefit  = raw.get("summary", ""),
-                        benefits     = benefits,
-                        apply_url    = raw.get("detailUrl", ""),
-                        accent_color = "#3182F6",
-                    ))
+                    
+                    with self.db.begin_nested():
+                        self.db.add(CardProduct(
+                            key          = TSID.create(),
+                            external_id  = external_id,
+                            company      = raw.get("cardCompany") or raw.get("company", ""),
+                            card_name    = raw.get("cardName", ""),
+                            top_benefit  = raw.get("summary", ""),
+                            benefits     = benefits,
+                            apply_url    = raw.get("detailUrl", ""),
+                            accent_color = "#3182F6",
+                        ))
                     saved += 1
 
-                except Exception as e:
+                except IntegrityError:
+                    skipped += 1
+                    logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
+                except SQLAlchemyError as e:
                     logger.error(f"[SyncService] 카드 저장 실패 - external_id={item.get('externalId')}, error={e}")
                     failed += 1
 
@@ -114,20 +119,22 @@ class SyncService:
                         {"label": "보장 구분",  "value": raw.get("mog", "")},
                         {"label": "기준일",     "value": raw.get("basDt", "")},
                     ], ensure_ascii=False)
-
-                    self.db.add(InsuranceProduct(
-                        key            = TSID.create(),
-                        external_id    = external_id,
-                        insurer        = raw.get("cmpyNm", ""),
-                        insurance_name = raw.get("prdNm", ""),
-                        top_benefit    = raw.get("mog", ""),
-                        benefits       = benefits,
-                        apply_url      = None,
-                        accent_color   = "#8B5CF6",
-                    ))
+                    with self.db.begin_nested():
+                        self.db.add(InsuranceProduct(
+                            key            = TSID.create(),
+                            external_id    = external_id,
+                            insurer        = raw.get("cmpyNm", ""),
+                            insurance_name = raw.get("prdNm", ""),
+                            top_benefit    = raw.get("mog", ""),
+                            benefits       = benefits,
+                            apply_url      = None,
+                            accent_color   = "#8B5CF6",
+                        ))
                     saved += 1
-
-                except Exception as e:
+                except IntegrityError:
+                    skipped += 1  
+                    logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
+                except SQLAlchemyError as e:
                     logger.error(f"[SyncService] 보험 저장 실패 - external_id={item.get('externalId')}, error={e}")
                     failed += 1
 
@@ -180,25 +187,28 @@ class SyncService:
                     deadline = ""
                     if grnt_end and len(grnt_end) == 8:
                         deadline = f"{grnt_end[:4]}.{grnt_end[4:6]}.{grnt_end[6:]}"
-
-                    self.db.add(PolicyProduct(
-                        key                = TSID.create(),
-                        external_id        = external_id,
-                        policy_name        = raw.get("insrncGdsNm", ""),
-                        org                = raw.get("orgNm") or raw.get("upOrgNm", ""),
-                        category           = "안전보험",
-                        category_color     = "#3182F6",
-                        deadline           = deadline,
-                        dday               = None,
-                        tags               = tags,
-                        core_benefit       = (raw.get("insrdNm", "") or "")[:255],
-                        description        = raw.get("clmMthd", ""),
-                        apply_url          = raw.get("hpgeUrl", ""),
-                        application_period = f"{raw.get('grntFrom', '')} ~ {raw.get('grntEnd', '')}",
-                    ))
+                    with self.db.begin_nested():
+                        self.db.add(PolicyProduct(
+                            key                = TSID.create(),
+                            external_id        = external_id,
+                            policy_name        = raw.get("insrncGdsNm", ""),
+                            org                = raw.get("orgNm") or raw.get("upOrgNm", ""),
+                            category           = "안전보험",
+                            category_color     = "#3182F6",
+                            deadline           = deadline,
+                            dday               = None,
+                            tags               = tags,
+                            core_benefit       = (raw.get("insrdNm", "") or "")[:255],
+                            description        = raw.get("clmMthd", ""),
+                            apply_url          = raw.get("hpgeUrl", ""),
+                            application_period = f"{raw.get('grntFrom', '')} ~ {raw.get('grntEnd', '')}",
+                        ))
                     saved += 1
 
-                except Exception as e:
+                except IntegrityError:
+                    skipped += 1  
+                    logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
+                except SQLAlchemyError as e:
                     logger.error(f"[SyncService] 정책 저장 실패 - external_id={item.get('externalId')}, error={e}")
                     failed += 1
 
