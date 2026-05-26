@@ -3,7 +3,6 @@ import json
 import logging
 import boto3
 from app.core.config.settings import settings
-bedrock_client = BedrockClient()
 
 logger = logging.getLogger(__name__)
 
@@ -101,5 +100,6 @@ class BedrockClient:
         logger.error(f"[BedrockClient] 최대 재시도 초과 - error={last_error}")
         raise last_error
 
+bedrock_client = BedrockClient()
 
 

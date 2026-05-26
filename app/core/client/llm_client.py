@@ -2,6 +2,7 @@
 import json
 import logging
 import anthropic
+import boto3
 
 from app.core.config.settings import settings
 from app.core.error.exception import BusinessException

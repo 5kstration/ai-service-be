@@ -234,7 +234,12 @@ class SyncService:
                 break
             page += 1
 
+        if saved > 0:
+            all_policies = self.db.query(PolicyProduct).all()
+            update_conflict_ids(self.db, all_policies)
+
         self._commit("정책")
+
         logger.info(f"[SyncService] 정책 동기화 완료 - saved={saved}, skipped={skipped}, failed={failed}")
         return {"saved": saved, "skipped": skipped, "failed": failed}
 
