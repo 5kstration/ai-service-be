@@ -19,19 +19,6 @@ def detect_conflict(p1: PolicyProduct, p2: PolicyProduct) -> bool:
         if p1.category and p2.category and p1.category == p2.category:
             return True
 
-    # 2. 나이 범위 겹침 + 동일 카테고리
-    if (
-        p1.age_min is not None and p1.age_max is not None and
-        p2.age_min is not None and p2.age_max is not None
-    ):
-        age_overlap = (p1.age_min <= p2.age_max and p2.age_min <= p1.age_max)
-        if (
-            age_overlap and
-            p1.category is not None and
-            p2.category is not None and
-            p1.category == p2.category
-        ):
-            return True
 
     # 3. 명시적 중복 불가 키워드
     desc1 = (p1.description or "") + (p1.core_benefit or "")

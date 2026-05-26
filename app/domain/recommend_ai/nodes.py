@@ -278,12 +278,23 @@ def llm_recommend_node(state: RecommendState) -> dict:
 
     db: Session = SessionLocal()
     try:
-        # conflict 텍스트 생성
         conflict_text = "없음"
         if state["conflict_info"]:
+            # key → 정책명 매핑 만들기
+            policy_name_map = {
+                p["key"]: p["policy_name"]
+                for p in state["filtered_policies"]
+            }
+            # policy_candidates도 포함 (filtered_policies에 없을 수 있음)
+            for p in state["policy_candidates"]:
+                if p["key"] not in policy_name_map:
+                    policy_name_map[p["key"]] = p["policy_name"]
+
             lines = []
             for pid, cids in state["conflict_info"].items():
-                lines.append(f"- {pid}는 {', '.join(cids)}와 중복 신청 불가")
+                pname  = policy_name_map.get(pid, pid)
+                cnames = [policy_name_map.get(cid, cid) for cid in cids]
+                lines.append(f"- {pname}은 {', '.join(cnames)}와 중복 신청 불가")
             conflict_text = "\n".join(lines)
 
         # 소비 패턴 텍스트 (TOP 3 강조)
@@ -338,7 +349,7 @@ def llm_recommend_node(state: RecommendState) -> dict:
    - "~할 것 같습니다" 표현 절대 금지 → "~할 수 있어요", "~에 딱 맞아요" 등 사용
 3. 보험은 유저 나이와 성별, 소비 패턴에서 유추한 라이프스타일 기반으로 추천
 4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
-5. 중복 불가 정책이 있으면 추천 사유 마지막에 "단, [정책명]과 중복 신청은 불가해요" 명시
+"5. 중복 불가 정책이 있으면 추천 사유 마지막에 \"단, [정책명]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!\" 형태로 정책명으로 명시"
 
 ## 응답 형식 (JSON만, 다른 텍스트 없이)
 {{

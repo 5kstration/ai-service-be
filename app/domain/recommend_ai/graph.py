@@ -108,7 +108,7 @@ async def run_recommend_pipeline(user_id: str) -> dict:
     try:
         result = await asyncio.wait_for(
             get_recommend_graph().ainvoke(initial_state),
-            timeout=60.0,
+            timeout=120.0,
         )
     except asyncio.TimeoutError:
         logger.error(f"[RecommendGraph] 타임아웃 - user_id={user_id}")
