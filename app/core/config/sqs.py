@@ -9,7 +9,6 @@ from app.core.config.settings import settings
 logger = logging.getLogger(__name__)
 
 _sqs_client = None
-
 _consumer_task = None
 
 
@@ -64,6 +63,7 @@ async def start_consumers():
     백그라운드 태스크로 실행.
     """
     sqs = get_sqs_client()
+    global _consumer_task
     if not sqs:
         logger.warning("[SQS] 클라이언트 없음 - consumer 등록 스킵")
         return
