@@ -1,11 +1,18 @@
-# app/domain/recommend_ai/graph.py
+# app/domain/recommend_ai/graph.py 전체 교체
+
 import asyncio
 import logging
 from langgraph.graph import StateGraph, START, END
 from app.domain.recommend_ai.state import RecommendState
 from app.domain.recommend_ai.nodes import (
-    profile_node, embed_node, vector_search_node,
-    filter_node, conflict_node, llm_recommend_node, save_node,
+    profile_node,
+    embed_node,
+    vector_search_node,
+    rerank_node,          # 추가
+    filter_node,
+    conflict_node,
+    llm_recommend_node,
+    save_node,
 )
 
 logger = logging.getLogger(__name__)
@@ -18,17 +25,19 @@ def _has_error(state: RecommendState) -> str:
 def build_recommend_graph():
     graph = StateGraph(RecommendState)
 
+    # 노드 등록
     graph.add_node("profile",       profile_node)
     graph.add_node("embed",         embed_node)
     graph.add_node("vector_search", vector_search_node)
+    graph.add_node("rerank",        rerank_node)       # 추가
     graph.add_node("filter",        filter_node)
     graph.add_node("conflict",      conflict_node)
     graph.add_node("llm",           llm_recommend_node)
     graph.add_node("save",          save_node)
 
+    # 엣지
     graph.add_edge(START, "profile")
 
-    # 각 노드마다 에러 감지 → 에러 있으면 save로 스킵
     graph.add_conditional_edges(
         "profile", _has_error,
         {"save": "save", "continue": "embed"},
@@ -39,7 +48,11 @@ def build_recommend_graph():
     )
     graph.add_conditional_edges(
         "vector_search", _has_error,
-        {"save": "save", "continue": "filter"},
+        {"save": "save", "continue": "rerank"},        # vector_search → rerank
+    )
+    graph.add_conditional_edges(
+        "rerank", _has_error,
+        {"save": "save", "continue": "filter"},        # rerank → filter
     )
     graph.add_conditional_edges(
         "filter",
@@ -57,6 +70,7 @@ def build_recommend_graph():
 
 
 _recommend_graph = None
+
 
 def get_recommend_graph():
     global _recommend_graph

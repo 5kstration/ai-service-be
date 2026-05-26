@@ -20,7 +20,7 @@ class BedrockClient:
     # 임베딩 생성 (Titan Embeddings V2)
     # =============================================
     def embed(self, text: str) -> list[float]:
-        """텍스트 → 1536차원 벡터 반환."""
+        """텍스트 → 1024 벡터 반환."""
         try:
             response = self._client.invoke_model(
                 modelId     = settings.BEDROCK_EMBED_MODEL,

@@ -100,22 +100,25 @@ def embed_node(state: RecommendState) -> dict:
         logger.error(f"[EmbedNode] 임베딩 실패 - error={e}")
         return {"error": str(e)}
 
-
 # =============================================
 # 3. 벡터 검색 노드
 # =============================================
+VECTOR_CANDIDATES = 20  # 리랭커가 받을 후보 수
+RERANK_TOP_N      = 7   # 리랭커 통과 후 LLM에 넘길 수
+ 
+ 
 def vector_search_node(state: RecommendState) -> dict:
     """pgvector cosine similarity → 후보 상품 검색."""
     if state.get("error"):
         return {}
-
+ 
     embedding = state["user_embedding"]
     vdb: Session = VectorSessionLocal()
     db: Session  = SessionLocal()
-
+ 
     try:
         embedding_str = f"[{','.join(map(str, embedding))}]"
-
+ 
         def search(product_type: str) -> list[str]:
             result = vdb.execute(text("""
                 SELECT product_id
@@ -129,16 +132,15 @@ def vector_search_node(state: RecommendState) -> dict:
                 "limit": VECTOR_CANDIDATES,
             })
             return [row[0] for row in result.fetchall()]
-
+ 
         card_ids      = search("card")
         insurance_ids = search("insurance")
         policy_ids    = search("policy")
-
-        # product_id로 실제 상품 조회
+ 
         cards      = db.query(CardProduct).filter(CardProduct.key.in_(card_ids)).all()
         insurances = db.query(InsuranceProduct).filter(InsuranceProduct.key.in_(insurance_ids)).all()
         policies   = db.query(PolicyProduct).filter(PolicyProduct.key.in_(policy_ids)).all()
-
+ 
         logger.info(
             f"[VectorSearchNode] 완료 - "
             f"cards={len(cards)}, insurances={len(insurances)}, policies={len(policies)}"
@@ -151,7 +153,69 @@ def vector_search_node(state: RecommendState) -> dict:
     finally:
         vdb.close()
         db.close()
-
+ 
+ 
+# =============================================
+# 3-1. 리랭크 노드
+# =============================================
+def rerank_node(state: RecommendState) -> dict:
+    """
+    벡터 검색 후보를 Cohere Rerank로 재정렬.
+    20개 → 7개로 압축해서 LLM 입력 토큰 절감.
+ 
+    실패 시: 원본 순서 그대로 top_n개 통과 (서비스 중단 없음)
+    """
+    if state.get("error"):
+        return {}
+ 
+    from app.domain.recommend_ai.reranker import reranker_client
+    from app.domain.recommend_ai.embed_service import _card_to_text, _insurance_to_text, _policy_to_text
+ 
+    # 유저 쿼리 텍스트 (임베딩 때 만든 것과 동일)
+    summary_text = ", ".join([
+        f"{s['category']} {s['amount']:,}원"
+        for s in state["monthly_summary"]
+    ])
+    query = (
+        f"나이 {state['user_age']}세 {state['user_sex']}. "
+        f"월급 {state['user_income']:,}원. "
+        f"이번 달 지출: {summary_text}"
+    )
+ 
+    def rerank_candidates(candidates: list, text_fn) -> list:
+        """후보 리스트를 리랭킹해서 상위 RERANK_TOP_N개만 반환."""
+        if not candidates:
+            return []
+        texts   = [text_fn(c) for c in candidates]
+        indices = reranker_client.rerank(query, texts, top_n=RERANK_TOP_N)
+        return [candidates[i] for i in indices]
+ 
+    # 카드 텍스트 변환 함수 (dict → str)
+    def card_text(c: dict) -> str:
+        return f"{c.get('company','')} {c.get('card_name','')}. {c.get('top_benefit','')}. 혜택: {c.get('benefits','')}"
+ 
+    def insurance_text(i: dict) -> str:
+        return f"{i.get('insurer','')} {i.get('insurance_name','')}. 핵심 혜택: {i.get('top_benefit','')}. 혜택 상세: {i.get('benefits','')}"
+ 
+    def policy_text(p: dict) -> str:
+        return f"{p.get('policy_name','')}. 카테고리: {p.get('category','')}. 태그: {p.get('tags','')}"
+ 
+    reranked_cards      = rerank_candidates(state["card_candidates"],      card_text)
+    reranked_insurances = rerank_candidates(state["insurance_candidates"],  insurance_text)
+    reranked_policies   = rerank_candidates(state["policy_candidates"],     policy_text)
+ 
+    logger.info(
+        f"[RerankNode] 완료 - "
+        f"cards: {len(state['card_candidates'])}→{len(reranked_cards)}, "
+        f"insurances: {len(state['insurance_candidates'])}→{len(reranked_insurances)}, "
+        f"policies: {len(state['policy_candidates'])}→{len(reranked_policies)}"
+    )
+ 
+    return {
+        "card_candidates":      reranked_cards,
+        "insurance_candidates": reranked_insurances,
+        "policy_candidates":    reranked_policies,
+    }
 
 # =============================================
 # 4. 필터 노드 (룰 기반)
