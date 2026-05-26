@@ -136,7 +136,7 @@ class SyncService:
                             accent_color   = "#8B5CF6",
                         ))
                     saved += 1
-              except IntegrityError:
+                except IntegrityError:
                     skipped += 1
                     logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
                 except (TypeError, ValueError, AttributeError) as e:
@@ -214,7 +214,7 @@ class SyncService:
                             application_period = f"{raw.get('grntFrom', '')} ~ {raw.get('grntEnd', '')}",
                         ))
                     saved += 1
-              except IntegrityError:
+                except IntegrityError:
                     skipped += 1
                     logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
                 except (TypeError, ValueError, AttributeError) as e:
