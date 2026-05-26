@@ -83,18 +83,34 @@ def embed_node(state: RecommendState) -> dict:
         return {}
 
     # 소비 패턴 텍스트 조합
-    summary_text = ", ".join([
-        f"{s['category']} {s['amount']:,}원"
-        for s in state["monthly_summary"]
-    ])
-    age = state['user_age'] or 0
-    sex = state['user_sex'] or '미입력'
-    income = state['user_income'] or 0
+    sorted_summary = sorted(
+        state["monthly_summary"],
+        key=lambda x: x["amount"],
+        reverse=True
+    )
+    total = sum(s["amount"] for s in sorted_summary)
+    top3  = sorted_summary[:3]
+
+    # 카테고리별 소비 성향 텍스트
+    category_desc = []
+    for s in sorted_summary:
+        ratio = int(s["amount"] / total * 100) if total > 0 else 0
+        category_desc.append(f"{s['category']} {s['amount']:,}원({ratio}%)")
+
+    # 절약 필요 카테고리 (상위 2개)
+    save_targets = ", ".join([s["category"] for s in top3[:2]])
+
+    # 소득 대비 지출 비율
+    spend_ratio = int(total / state["user_income"] * 100) if state["user_income"] else 0
 
     text = (
-        f"나이 {age}세 {sex}. "
-        f"월급 {income:,}원. "
-        f"이번 달 지출: {summary_text}"
+        f"나이 {state['user_age']}세 {state['user_sex']} 청년. "
+        f"월 소득 {state['user_income']:,}원. "
+        f"이번 달 총 지출 {total:,}원 (소득의 {spend_ratio}%). "
+        f"지출 상세: {', '.join(category_desc)}. "
+        f"가장 많이 쓰는 카테고리: {', '.join([s['category'] for s in top3])}. "
+        f"절약이 필요한 영역: {save_targets}. "
+        f"관심 혜택: 할인카드, 청년정책, 주거지원, 금융혜택."
     )
 
     try:
