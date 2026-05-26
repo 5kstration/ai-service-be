@@ -20,7 +20,7 @@ from app.core.utils.tsid import TSID
 logger = logging.getLogger(__name__)
 
 MAX_RECOMMEND = 5
-VECTOR_CANDIDATES = 10  # 벡터 검색 후보 수
+VECTOR_CANDIDATES = 30  # 벡터 검색 후보 수
 RERANK_TOP_N      = 7   # 리랭커 통과 후 LLM에 넘길 수
 
 
