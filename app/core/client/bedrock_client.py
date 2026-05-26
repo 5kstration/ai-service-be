@@ -54,7 +54,7 @@ class BedrockClient:
                     body        = json.dumps({
                         "anthropic_version": "bedrock-2023-05-31",
                         "max_tokens":        2000,
-                        "temperature":       0.3,   # 추천은 일관성 중요 → 낮게
+                        "temperature":       0.2,   
                         "messages": [
                             {"role": "user", "content": prompt}
                         ],

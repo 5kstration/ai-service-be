@@ -108,7 +108,7 @@ def embed_all_products():
         logger.info(f"[EmbedService] 임베딩 완료 - total={saved}개")
     except Exception:
         vdb.rollback()
-        logger.error(f"[EmbedService] 임베딩 저장 실패")
+        logger.error("[EmbedService] 임베딩 저장 실패")
         raise
 
     finally:
