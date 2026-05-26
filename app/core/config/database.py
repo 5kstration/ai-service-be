@@ -2,15 +2,18 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from dotenv import load_dotenv
 import os
+from sqlalchemy import create_engine, URL
 
 load_dotenv()
 
-DB_URL = (
-    f"postgresql+psycopg2://"
-    f"{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-    f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}"
-    f"/{os.getenv('DB_NAME')}"
-    f"?sslmode=require" 
+DB_URL = URL.create(
+    drivername = "postgresql+psycopg2",
+    username   = os.getenv("DB_USER"),
+    password   = os.getenv("DB_PASSWORD"),
+    host       = os.getenv("DB_HOST"),
+    port       = int(os.getenv("DB_PORT", 5432)),
+    database   = os.getenv("DB_NAME"),
+    query      = {"sslmode": "require"},
 )
 
 engine = create_engine(DB_URL, echo=True)

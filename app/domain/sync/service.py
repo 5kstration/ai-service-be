@@ -9,6 +9,7 @@ from app.domain.recommend.entity import CardProduct, InsuranceProduct, PolicyPro
 from app.domain.sync.client import raw_external_client
 from app.core.utils.tsid import TSID
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from app.domain.sync.conflict import update_conflict_ids
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +215,9 @@ class SyncService:
                             application_period = f"{raw.get('grntFrom', '')} ~ {raw.get('grntEnd', '')}",
                         ))
                     saved += 1
+                    all_policies = self.db.query(PolicyProduct).all()
+                    update_conflict_ids(self.db, all_policies)
+
                 except IntegrityError:
                     skipped += 1
                     logger.warning(f"[SyncService] 중복 external_id 스킵 - external_id={external_id}")
@@ -230,7 +234,12 @@ class SyncService:
                 break
             page += 1
 
+        if saved > 0:
+            all_policies = self.db.query(PolicyProduct).all()
+            update_conflict_ids(self.db, all_policies)
+
         self._commit("정책")
+
         logger.info(f"[SyncService] 정책 동기화 완료 - saved={saved}, skipped={skipped}, failed={failed}")
         return {"saved": saved, "skipped": skipped, "failed": failed}
 
