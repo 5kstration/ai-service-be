@@ -20,6 +20,8 @@ class RerankerClient:
     def rerank(self, query, documents, top_n=7):
         if not documents:
             return []
+        if top_n <=0:
+            return []
         top_n = min(top_n, len(documents))
         if self._model is None:
             return list(range(top_n))
