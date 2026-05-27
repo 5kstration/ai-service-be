@@ -83,18 +83,36 @@ def embed_node(state: RecommendState) -> dict:
         return {}
 
     # 소비 패턴 텍스트 조합
-    summary_text = ", ".join([
-        f"{s['category']} {s['amount']:,}원"
-        for s in state["monthly_summary"]
-    ])
-    age = state['user_age'] or 0
-    sex = state['user_sex'] or '미입력'
-    income = state['user_income'] or 0
+    sorted_summary = sorted(
+        state["monthly_summary"],
+        key=lambda x: x["amount"],
+        reverse=True
+    )
+    total = sum(s["amount"] for s in sorted_summary)
+    top3  = sorted_summary[:3]
+
+    # 카테고리별 소비 성향 텍스트
+    category_desc = []
+    for s in sorted_summary:
+        ratio = int(s["amount"] / total * 100) if total > 0 else 0
+        category_desc.append(f"{s['category']} {s['amount']:,}원({ratio}%)")
+
+    # 절약 필요 카테고리 (상위 2개)
+    save_targets = ", ".join([s["category"] for s in top3[:2]])
+
+    # 소득 대비 지출 비율
+    income = state.get("user_income")
+    income_text = f"{income:,}원" if income is not None else "미상"
+    spend_ratio = int(total / income * 100) if income else 0
 
     text = (
-        f"나이 {age}세 {sex}. "
-        f"월급 {income:,}원. "
-        f"이번 달 지출: {summary_text}"
+        f"나이 {state['user_age']}세 {state['user_sex']} 청년. "
+        f"월 소득 {income_text}. "
+        f"이번 달 총 지출 {total:,}원 (소득의 {spend_ratio}%). "
+        f"지출 상세: {', '.join(category_desc)}. "
+        f"가장 많이 쓰는 카테고리: {', '.join([s['category'] for s in top3])}. "
+        f"절약이 필요한 영역: {save_targets}. "
+        f"관심 혜택: 할인카드, 청년정책, 주거지원, 금융혜택."
     )
 
     try:
@@ -278,12 +296,23 @@ def llm_recommend_node(state: RecommendState) -> dict:
 
     db: Session = SessionLocal()
     try:
-        # conflict 텍스트 생성
         conflict_text = "없음"
         if state["conflict_info"]:
+            # key → 정책명 매핑 만들기
+            policy_name_map = {
+                p["key"]: p["policy_name"]
+                for p in state["filtered_policies"]
+            }
+            # policy_candidates도 포함 (filtered_policies에 없을 수 있음)
+            for p in state["policy_candidates"]:
+                if p["key"] not in policy_name_map:
+                    policy_name_map[p["key"]] = p["policy_name"]
+
             lines = []
             for pid, cids in state["conflict_info"].items():
-                lines.append(f"- {pid}는 {', '.join(cids)}와 중복 신청 불가")
+                pname  = policy_name_map.get(pid, pid)
+                cnames = [policy_name_map.get(cid, cid) for cid in cids]
+                lines.append(f"- {pname}은 {', '.join(cnames)}와 중복 신청 불가")
             conflict_text = "\n".join(lines)
 
         # 소비 패턴 텍스트 (TOP 3 강조)
@@ -338,7 +367,7 @@ def llm_recommend_node(state: RecommendState) -> dict:
    - "~할 것 같습니다" 표현 절대 금지 → "~할 수 있어요", "~에 딱 맞아요" 등 사용
 3. 보험은 유저 나이와 성별, 소비 패턴에서 유추한 라이프스타일 기반으로 추천
 4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
-5. 중복 불가 정책이 있으면 추천 사유 마지막에 "단, [정책명]과 중복 신청은 불가해요" 명시
+"5. 중복 불가 정책이 있으면 추천 사유 마지막에 \"단, [정책명]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!\" 형태로 정책명으로 명시"
 
 ## 응답 형식 (JSON만, 다른 텍스트 없이)
 {{
