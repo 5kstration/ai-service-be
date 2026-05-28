@@ -69,10 +69,7 @@ def _ensure_constraints() -> None:
         "CREATE CONSTRAINT tag_name IF NOT EXISTS FOR (n:Tag) REQUIRE n.name IS UNIQUE",
     ]
     for stmt in statements:
-        try:
-            _run_write(stmt)
-        except Exception as e:
-            logger.warning(f"[GraphSync] constraint 스킵 - {e}")
+        _run_write(stmt)
 
 
 def _clear_graph() -> None:

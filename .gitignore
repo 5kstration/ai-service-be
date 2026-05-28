@@ -12,6 +12,7 @@ benchmark_result.json
 docker-compose.yml
 app/core/client/eval.py
 eval_result.json
+app/core/client/generate_graph_users.py
 
 # Secrets / credentials
 *.pem

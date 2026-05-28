@@ -58,7 +58,7 @@ def build_recommend_graph():
     )
     graph.add_conditional_edges(
         "filter",
-        lambda s: "save" if (s.get("error") or not s.get("filtered_policies")) else "graph_expand",
+        lambda s: "save" if s.get("error") else "graph_expand",
         {"graph_expand": "graph_expand", "save": "save"},
     )
     graph.add_conditional_edges(

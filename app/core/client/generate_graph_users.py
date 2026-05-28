@@ -14,6 +14,10 @@ CATEGORIES = ["식비", "교통", "쇼핑", "카페", "주거", "문화", "통�
 
 def generate_graph_users():
     print("🚀 그래프 풍부화: 더미 유저 및 구독(Subscription) 관계 생성 중...")
+    if not neo4j_client._is_ready() or neo4j_client._driver is None:
+        print("❌ Neo4j가 준비되지 않았습니다.")
+        return
+
     with neo4j_client._driver.session(database=settings.NEO4J_DATABASE) as session:
         # 기존 User 삭제 (초기화)
         session.run("MATCH (u:User) DETACH DELETE u")
@@ -35,20 +39,39 @@ def generate_graph_users():
                 user_id = f"01HXGRAPH{str(b*batch_size + i).zfill(4)}{uuid.uuid4().hex[:10].upper()}"
                 fav_cat = random.choice(CATEGORIES)
                 
-                sub_policies = random.sample(policies, random.randint(1, 3))
-                sub_cards = random.sample(cards, random.randint(1, 3))
-                sub_insurances = random.sample(insurances, random.randint(1, 3))
+                sub_policies = random.sample(policies, min(len(policies), random.randint(1, 3)))
+                sub_cards = random.sample(cards, min(len(cards), random.randint(1, 3)))
+                sub_insurances = random.sample(insurances, min(len(insurances), random.randint(1, 3)))
                 
                 # Cypher query for this user
-                q = f"CREATE (u:User {{user_id: '{user_id}', favorite_category: '{fav_cat}'}})\n"
-                for p_key in sub_policies:
-                    q += f"WITH u MATCH (p:Policy {{key: '{p_key}'}}) MERGE (u)-[:SUBSCRIBED_TO]->(p)\n"
-                for c_key in sub_cards:
-                    q += f"WITH u MATCH (c:Card {{key: '{c_key}'}}) MERGE (u)-[:SUBSCRIBED_TO]->(c)\n"
-                for i_key in sub_insurances:
-                    q += f"WITH u MATCH (ins:Insurance {{key: '{i_key}'}}) MERGE (u)-[:SUBSCRIBED_TO]->(ins)\n"
-                
-                session.run(q)
+                session.run(
+                    "CREATE (u:User {user_id: $user_id, favorite_category: $fav_cat})",
+                    user_id=user_id, fav_cat=fav_cat
+                )
+                if sub_policies:
+                    session.run(
+                        "MATCH (u:User {user_id: $user_id}) "
+                        "UNWIND $keys AS key "
+                        "MATCH (p:Policy {key: key}) "
+                        "MERGE (u)-[:SUBSCRIBED_TO]->(p)",
+                        user_id=user_id, keys=sub_policies
+                    )
+                if sub_cards:
+                    session.run(
+                        "MATCH (u:User {user_id: $user_id}) "
+                        "UNWIND $keys AS key "
+                        "MATCH (c:Card {key: key}) "
+                        "MERGE (u)-[:SUBSCRIBED_TO]->(c)",
+                        user_id=user_id, keys=sub_cards
+                    )
+                if sub_insurances:
+                    session.run(
+                        "MATCH (u:User {user_id: $user_id}) "
+                        "UNWIND $keys AS key "
+                        "MATCH (i:Insurance {key: key}) "
+                        "MERGE (u)-[:SUBSCRIBED_TO]->(i)",
+                        user_id=user_id, keys=sub_insurances
+                    )
                 
             print(f"  ✅ {(b+1)*batch_size}명 생성 완료...")
         

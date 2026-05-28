@@ -58,7 +58,8 @@ class Neo4jClient:
         max_val = max(10, min(int(max_val), 200))
 
         # label_hint가 있으면 우선 시도, 실패 시(라벨 미존재 등)도 soft-fail로 처리
-        label_match = f":{label_hint}" if label_hint else ""
+        valid_labels = {"Policy", "Card", "Insurance", "Category", "Organization", "Tag", "User"}
+        label_match = f":{label_hint}" if label_hint and label_hint in valid_labels else ""
 
         cypher = f"""
         MATCH (start_node{label_match})

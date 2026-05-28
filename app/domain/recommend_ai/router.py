@@ -1,6 +1,7 @@
 # app/domain/recommend_ai/router.py
 import logging
 from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.domain.recommend_ai.graph import run_recommend_pipeline
@@ -53,7 +54,7 @@ async def sync_graph(
     - include_similar=true: pgvector 유사도 기반 SIMILAR_TO 관계 생성
     """
     logger.info("[RecommendAIRouter] POST /sync/graph")
-    stats = sync_knowledge_graph(clear=clear, include_similar=include_similar)
+    stats = await run_in_threadpool(sync_knowledge_graph, clear=clear, include_similar=include_similar)
     return CommonResponse.of(stats)
 
 
@@ -62,4 +63,5 @@ async def sync_graph(
     summary="Neo4j 그래프 통계 조회",
 )
 async def graph_stats():
-    return CommonResponse.of(get_graph_stats())
+    stats = await run_in_threadpool(get_graph_stats)
+    return CommonResponse.of(stats)
