@@ -10,6 +10,7 @@ from app.domain.recommend_ai.nodes import (
     vector_search_node,
     rerank_node,          # 추가
     filter_node,
+    graph_expand_node,
     conflict_node,
     llm_recommend_node,
     save_node,
@@ -31,6 +32,7 @@ def build_recommend_graph():
     graph.add_node("vector_search", vector_search_node)
     graph.add_node("rerank",        rerank_node)       # 추가
     graph.add_node("filter",        filter_node)
+    graph.add_node("graph_expand",  graph_expand_node)
     graph.add_node("conflict",      conflict_node)
     graph.add_node("llm",           llm_recommend_node)
     graph.add_node("save",          save_node)
@@ -56,8 +58,12 @@ def build_recommend_graph():
     )
     graph.add_conditional_edges(
         "filter",
-        lambda s: "save" if (s.get("error") or not s.get("filtered_policies")) else "conflict",
-        {"conflict": "conflict", "save": "save"},
+        lambda s: "save" if s.get("error") else "graph_expand",
+        {"graph_expand": "graph_expand", "save": "save"},
+    )
+    graph.add_conditional_edges(
+        "graph_expand", _has_error,
+        {"save": "save", "continue": "conflict"},
     )
     graph.add_conditional_edges(
         "conflict", _has_error,
@@ -98,6 +104,9 @@ async def run_recommend_pipeline(user_id: str) -> dict:
         "insurance_candidates":   [],
         "policy_candidates":      [],
         "filtered_policies":      [],
+        "policy_graph_triples":   [],
+        "card_graph_triples":     [],
+        "insurance_graph_triples": [],
         "conflict_info":          {},
         "recommended_cards":      [],
         "recommended_insurances": [],

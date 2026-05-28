@@ -39,6 +39,13 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
+    # 외부 클라이언트 종료
+    try:
+        from app.core.client.neo4j_client import neo4j_client
+        neo4j_client.close()
+    except Exception as e:
+        logging.error(f"Neo4j client close failed: {e}")
+
     from app.core.config.scheduler import scheduler
     if scheduler.running:
         scheduler.shutdown(wait=False)

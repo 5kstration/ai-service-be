@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     VECTOR_DB_USER:     str = ""
     VECTOR_DB_PASSWORD: str = ""
     
+    # Neo4j (Graph RAG)
+    # - .env에 NEO4J_URI가 이미 있으면 활성화 없이도 동작하게 만들기 위해, client에서 자동 enable도 지원
+    NEO4J_ENABLED: bool = False
+    NEO4J_URI: str = ""
+    # 호환성: 기존 .env에 NEO4J_USERNAME을 쓰는 경우 지원
+    NEO4J_USER: str = ""
+    NEO4J_USERNAME: str = ""
+    NEO4J_PASSWORD: str = ""
+    NEO4J_DATABASE: str = "neo4j"
+    # 그래프 확장 깊이/최대 트리플 수 (LLM 토큰 보호용)
+    NEO4J_POLICY_HOPS: int = 2
+    NEO4J_POLICY_MAX_TRIPLES: int = 60
+    
     
     class Config:
         env_file = ".env"

@@ -13,6 +13,7 @@ from app.domain.recommend.entity import (
 )
 from app.domain.profile.entity import UserProfile
 from app.core.client.bedrock_client import bedrock_client
+from app.core.client.neo4j_client import neo4j_client
 from app.core.config.database import SessionLocal
 from app.core.config.vector_database import VectorSessionLocal
 from app.core.utils.tsid import TSID
@@ -140,6 +141,15 @@ def vector_search_node(state: RecommendState) -> dict:
     try:
         embedding_str = f"[{','.join(map(str, embedding))}]"
  
+        # 1. Neo4j Graph Retrieval (Top 2 카테고리 기반 10개씩)
+        sorted_summary = sorted(state.get("monthly_summary", []), key=lambda x: x.get("amount", 0), reverse=True)
+        top_categories = [s["category"] for s in sorted_summary[:2]]
+        graph_candidates = neo4j_client.fetch_candidates_by_categories(top_categories, limit=10)
+
+        # 2. Neo4j Collaborative Filtering (비슷한 카테고리 선호 유저들이 많이 가입한 상품 10개씩)
+        cf_candidates = neo4j_client.fetch_candidates_by_cf(top_categories, limit=10)
+
+        # 3. Vector Search (임베딩 유사도 기반 30개씩)
         def search(product_type: str) -> list[str]:
             result = vdb.execute(text("""
                 SELECT product_id
@@ -150,13 +160,14 @@ def vector_search_node(state: RecommendState) -> dict:
             """), {
                 "ptype": product_type,
                 "emb":   embedding_str,
-                "limit": VECTOR_CANDIDATES,
+                "limit": 30, # 기존처럼 벡터 검색 30개 유지 (Recall 손실 방지)
             })
             return [row[0] for row in result.fetchall()]
  
-        card_ids      = search("card")
-        insurance_ids = search("insurance")
-        policy_ids    = search("policy")
+        # 세 가지 결과를 중복 제거하여 합침 (최대 50개)
+        card_ids      = list(set(search("card") + graph_candidates.get("cards", []) + cf_candidates.get("cards", [])))
+        insurance_ids = list(set(search("insurance") + graph_candidates.get("insurances", []) + cf_candidates.get("insurances", [])))
+        policy_ids    = list(set(search("policy") + graph_candidates.get("policies", []) + cf_candidates.get("policies", [])))
  
         cards      = db.query(CardProduct).filter(CardProduct.key.in_(card_ids)).all()
         insurances = db.query(InsuranceProduct).filter(InsuranceProduct.key.in_(insurance_ids)).all()
@@ -268,6 +279,51 @@ def filter_node(state: RecommendState) -> dict:
 
 
 # =============================================
+# 4-1. Graph 확장 노드 (Neo4j)
+# =============================================
+def graph_expand_node(state: RecommendState) -> dict:
+    """
+    필터링된 정책 후보를 Neo4j 그래프로 확장해서 LLM 근거 컨텍스트를 강화.
+    Neo4j 설정이 없으면 빈 결과를 반환하고 파이프라인은 계속 진행.
+    """
+    if state.get("error"):
+        return {}
+
+    # 카드/보험 후보(리랭크 이후)를 그래프로 확장
+    card_keys = [
+        c.get("key")
+        for c in (state.get("card_candidates") or [])
+        if isinstance(c, dict) and c.get("key")
+    ]
+    insurance_keys = [
+        i.get("key")
+        for i in (state.get("insurance_candidates") or [])
+        if isinstance(i, dict) and i.get("key")
+    ]
+
+    # 정책은 필터링된 후보를 기준으로 확장
+    policies = state.get("filtered_policies") or []
+    policy_keys = [p.get("key") for p in policies if isinstance(p, dict) and p.get("key")]
+
+    card_triples = neo4j_client.fetch_triples(card_keys, label_hint="Card")
+    insurance_triples = neo4j_client.fetch_triples(insurance_keys, label_hint="Insurance")
+    policy_triples = neo4j_client.fetch_triples(policy_keys, label_hint="Policy")
+
+    logger.info(
+        "[GraphExpandNode] 완료 - "
+        f"cards={len(card_keys)}/{len(card_triples)}triples, "
+        f"insurances={len(insurance_keys)}/{len(insurance_triples)}triples, "
+        f"policies={len(policy_keys)}/{len(policy_triples)}triples"
+    )
+
+    return {
+        "card_graph_triples": card_triples,
+        "insurance_graph_triples": insurance_triples,
+        "policy_graph_triples": policy_triples,
+    }
+
+
+# =============================================
 # 5. Conflict 노드
 # =============================================
 def conflict_node(state: RecommendState) -> dict:
@@ -277,7 +333,11 @@ def conflict_node(state: RecommendState) -> dict:
 
     conflict_info = {}
     for policy in state["filtered_policies"]:
-        conflict_ids = json.loads(policy.get("conflict_policy_ids") or "[]")
+        raw = policy.get("conflict_policy_ids")
+        if isinstance(raw, list):
+            conflict_ids = raw
+        else:
+            conflict_ids = json.loads(raw or "[]")
         if conflict_ids:
             conflict_info[policy["key"]] = conflict_ids
 
@@ -332,6 +392,20 @@ def llm_recommend_node(state: RecommendState) -> dict:
 
         top3_text = ", ".join([f"{s['category']}({s['amount']:,}원)" for s in top3])
 
+        def triples_to_lines(triples: list) -> str:
+            lines = []
+            for t in (triples or [])[:200]:
+                s = str(t.get("s", ""))
+                p = str(t.get("p", ""))
+                o = str(t.get("o", ""))
+                if s and p and o:
+                    lines.append(f"- ({s}) -[{p}]-> ({o})")
+            return "\n".join(lines) if lines else "없음"
+
+        card_graph_context = triples_to_lines(state.get("card_graph_triples") or [])
+        insurance_graph_context = triples_to_lines(state.get("insurance_graph_triples") or [])
+        policy_graph_context = triples_to_lines(state.get("policy_graph_triples") or [])
+
         prompt = f"""당신은 청년 금융 전문가입니다. 아래 유저 정보와 소비 패턴을 꼼꼼히 분석하여 가장 적합한 금융 상품을 추천해주세요.
 
 ## 유저 프로필
@@ -354,6 +428,15 @@ def llm_recommend_node(state: RecommendState) -> dict:
 ## 후보 정책 목록
 {json.dumps(state['filtered_policies'], ensure_ascii=False, indent=2)}
 
+## 카드 지식그래프 근거 (Neo4j, 선택)
+{card_graph_context}
+
+## 보험 지식그래프 근거 (Neo4j, 선택)
+{insurance_graph_context}
+
+## 정책 지식그래프 근거 (Neo4j, 선택)
+{policy_graph_context}
+
 ## 정책 중복 불가 정보
 {conflict_text}
 
@@ -361,13 +444,14 @@ def llm_recommend_node(state: RecommendState) -> dict:
 1. 카드/보험/정책 각각 최대 {MAX_RECOMMEND}개 선택
 2. 추천 사유 작성 규칙:
    - 반드시 유저의 실제 소비 데이터(금액, 카테고리)를 언급할 것
+   - 지식그래프(Neo4j) 근거가 있는 상품을 추천할 경우, 이를 활용하여 상품이 유저의 소비 카테고리와 어떻게 연결되는지 자연스럽게 설명할 것 (단, 그래프 근거가 없더라도 유저에게 가장 적합한 상품이라면 우선적으로 추천할 것)
    - 예시: "이번 달 식비 {top3[0]['amount']:,}원을 지출했는데, 이 카드로 매달 약 XX원 절약 가능해요"
    - 친근하고 응원하는 톤으로 작성 (딱딱한 설명 금지)
    - 1~2문장으로 간결하게
    - "~할 것 같습니다" 표현 절대 금지 → "~할 수 있어요", "~에 딱 맞아요" 등 사용
 3. 보험은 유저 나이와 성별, 소비 패턴에서 유추한 라이프스타일 기반으로 추천
 4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
-"5. 중복 불가 정책이 있으면 추천 사유 마지막에 \"단, [정책명]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!\" 형태로 정책명으로 명시"
+5. 중복 불가 정책이 있으면 추천 사유 마지막에 "단, [정책명]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!" 형태로 정책명으로 명시
 
 ## 응답 형식 (JSON만, 다른 텍스트 없이)
 {{
