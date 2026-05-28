@@ -1,6 +1,7 @@
 # app/domain/recommend_ai/nodes.py
 import json
 import logging
+import sys
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -453,18 +454,26 @@ def llm_recommend_node(state: RecommendState) -> dict:
 4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
 5. 중복 불가 정책이 있으면 추천 사유 마지막에 "단, [정책명]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!" 형태로 정책명으로 명시
 
-## 응답 형식 (JSON만, 다른 텍스트 없이)
-{{
+## [중요] 응답 프로세스 (Chain of Thought)
+최종 JSON 응답을 생성하기 전에, 반드시 `<thinking>` 태그를 사용하여 유저의 소비 패턴을 분석하고 각 상품이 왜 적합한지 짧게 추론하는 과정을 먼저 작성하세요.
+그 다음, 완벽한 JSON 형식으로 최종 결과를 출력하세요. 마크다운 코드블럭(```json ... ```) 안에 작성해야 합니다.
+
+[출력 예시]
+<thinking>
+- 유저는 식비 지출이 가장 높음. A카드는 음식점 10% 할인이 있으므로 식비 절감에 적합.
+- 나이가 25세이고 대중교통 이용이 잦을 수 있으므로 B정책(청년 교통비 지원) 적합. 단 C정책과 중복 불가.
+</thinking>
+```json
+{
   "cards": [
-    {{"product_id": "상품key", "reason": "추천 사유"}}
+    {"product_id": "card_a", "reason": "이번 달 식비에 가장 많은 금액을 쓰셨네요! 이 카드로 배달앱과 음식점 할인을 받으면 식비를 크게 절약할 수 있어요."}
   ],
-  "insurances": [
-    {{"product_id": "상품key", "reason": "추천 사유"}}
-  ],
+  "insurances": [],
   "policies": [
-    {{"product_id": "상품key", "reason": "추천 사유"}}
+    {"product_id": "policy_b", "reason": "매일 출퇴근하시는 25세 청년에게 딱 맞는 교통비 지원 정책이에요. 단, [C정책]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!"}
   ]
-}}"""
+}
+```"""
 
         response_text = bedrock_client.recommend(prompt)
 
@@ -509,29 +518,35 @@ def save_node(state: RecommendState) -> dict:
 
         # 카드 저장
         for item in state.get("recommended_cards", []):
+            product_id = item.get("product_id") or item.get("key")
+            if not product_id: continue
             db.add(RecommendCard(
                 key             = TSID.create(),
                 user_id         = user_id,
-                card_product_id = item["product_id"],
-                ai_reason       = item["reason"],
+                card_product_id = product_id,
+                ai_reason       = item.get("reason", ""),
             ))
 
         # 보험 저장
         for item in state.get("recommended_insurances", []):
+            product_id = item.get("product_id") or item.get("key")
+            if not product_id: continue
             db.add(RecommendInsurance(
                 key                  = TSID.create(),
                 user_id              = user_id,
-                insurance_product_id = item["product_id"],
-                ai_reason            = item["reason"],
+                insurance_product_id = product_id,
+                ai_reason            = item.get("reason", ""),
             ))
 
         # 정책 저장
         for item in state.get("recommended_policies", []):
+            product_id = item.get("product_id") or item.get("key")
+            if not product_id: continue
             db.add(RecommendPolicy(
                 key               = TSID.create(),
                 user_id           = user_id,
-                policy_product_id = item["product_id"],
-                ai_reason         = item["reason"],
+                policy_product_id = product_id,
+                ai_reason         = item.get("reason", ""),
             ))
 
         db.commit()
