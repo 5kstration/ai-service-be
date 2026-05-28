@@ -466,11 +466,11 @@ def llm_recommend_node(state: RecommendState) -> dict:
 ```json
 {
   "cards": [
-    {"product_id": "card_a", "reason": "이번 달 식비에 가장 많은 금액을 쓰셨네요! 이 카드로 배달앱과 음식점 할인을 받으면 식비를 크게 절약할 수 있어요."}
+    {"key": "01HXPRODCARD00000001", "reason": "이번 달 식비에 가장 많은 금액을 쓰셨네요! 이 카드로 배달앱과 음식점 할인을 받으면 식비를 크게 절약할 수 있어요."}
   ],
   "insurances": [],
   "policies": [
-    {"product_id": "policy_b", "reason": "매일 출퇴근하시는 25세 청년에게 딱 맞는 교통비 지원 정책이에요. 단, [C정책]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!"}
+    {"key": "01HXPRODPOL000000021", "reason": "매일 출퇴근하시는 25세 청년에게 딱 맞는 교통비 지원 정책이에요. 단, [C정책]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!"}
   ]
 }
 ```"""
@@ -516,10 +516,16 @@ def save_node(state: RecommendState) -> dict:
         db.query(RecommendInsurance).filter(RecommendInsurance.user_id == user_id).delete()
         db.query(RecommendPolicy).filter(RecommendPolicy.user_id == user_id).delete()
 
+        # 검증용 allowlist 생성
+        valid_card_keys = {c.get("key") for c in state.get("card_candidates", []) if c.get("key")}
+        valid_ins_keys = {i.get("key") for i in state.get("insurance_candidates", []) if i.get("key")}
+        valid_pol_keys = {p.get("key") for p in state.get("filtered_policies", []) if p.get("key")}
+
         # 카드 저장
         for item in state.get("recommended_cards", []):
             product_id = item.get("product_id") or item.get("key")
-            if not product_id: continue
+            if not product_id or product_id not in valid_card_keys: 
+                continue
             db.add(RecommendCard(
                 key             = TSID.create(),
                 user_id         = user_id,
@@ -530,7 +536,8 @@ def save_node(state: RecommendState) -> dict:
         # 보험 저장
         for item in state.get("recommended_insurances", []):
             product_id = item.get("product_id") or item.get("key")
-            if not product_id: continue
+            if not product_id or product_id not in valid_ins_keys: 
+                continue
             db.add(RecommendInsurance(
                 key                  = TSID.create(),
                 user_id              = user_id,
@@ -541,7 +548,8 @@ def save_node(state: RecommendState) -> dict:
         # 정책 저장
         for item in state.get("recommended_policies", []):
             product_id = item.get("product_id") or item.get("key")
-            if not product_id: continue
+            if not product_id or product_id not in valid_pol_keys: 
+                continue
             db.add(RecommendPolicy(
                 key               = TSID.create(),
                 user_id           = user_id,
