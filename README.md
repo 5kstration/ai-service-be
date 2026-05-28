@@ -25,7 +25,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| Language | Python 3.9 |
+| Language | Python 3.9.23 |
 | Framework | FastAPI 0.115.0 |
 | ASGI Server | Uvicorn 0.30.0 |
 

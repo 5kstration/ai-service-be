@@ -23,6 +23,11 @@ class RecommendState(TypedDict):
     # 4. 필터 노드
     filtered_policies: list
 
+    # 4-1. Graph 확장 (Neo4j)
+    policy_graph_triples: list  # [{"s":..., "p":..., "o":..., ...}, ...]
+    card_graph_triples: list
+    insurance_graph_triples: list
+
     # 5. conflict 노드
     conflict_info: dict  # {policy_id: [conflict_policy_ids]}
 
