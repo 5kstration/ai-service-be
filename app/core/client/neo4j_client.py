@@ -7,6 +7,10 @@ from app.core.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# Neo4j 드라이버 자체의 쓸데없는 Warning(UnknownPropertyKeyWarning 등) 로그 숨김
+logging.getLogger("neo4j").setLevel(logging.ERROR)
+logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
+
 
 class Neo4jClient:
     """

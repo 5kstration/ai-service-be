@@ -15,7 +15,7 @@ DB_URL = URL.create(
     query      = {"sslmode": "require"},
 )
 
-engine = create_engine(DB_URL, echo=True)
+engine = create_engine(DB_URL, echo=False)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
