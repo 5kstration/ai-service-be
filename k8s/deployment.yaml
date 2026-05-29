@@ -15,11 +15,22 @@ spec:
       labels:
         app: ai-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: ai-service
           image: 525089404962.dkr.ecr.ap-northeast-2.amazonaws.com/ai-service-be:IMAGE_TAG_PLACEHOLDER
           ports:
             - containerPort: 8000   # FastAPI 기본 포트
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
           resources:
             requests:
               cpu: "200m"           # AI 서비스라 budget보다 조금 더 줌

@@ -68,20 +68,20 @@ pipeline {
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
                     sh '''
-                        aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+                        export KUBECONFIG="$WORKSPACE/.kube/config"
+                        mkdir -p "$(dirname "$KUBECONFIG")"
+                        aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --kubeconfig "$KUBECONFIG"
 
                         # deployment.yaml 이미지 태그 치환
                         sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" k8s/deployment.yaml
 
                         # 네임스페이스 없으면 생성
-                        kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-
+                        kubectl --kubeconfig "$KUBECONFIG" create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl --kubeconfig "$KUBECONFIG" apply -f -
                         # k8s 리소스 적용
-                        kubectl apply -f k8s/
+                        kubectl --kubeconfig "$KUBECONFIG" apply -f k8s/
 
                         # 배포 완료 대기
-                        kubectl -n "$K8S_NAMESPACE" rollout status deployment/ai-service --timeout=180s
-                    '''
+                        kubectl --kubeconfig "$KUBECONFIG" -n "$K8S_NAMESPACE" rollout status deployment/ai-service --timeout=180s                    '''
                 }
             }
         }
