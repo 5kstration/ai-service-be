@@ -1,0 +1,17 @@
+# k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: moneylog
+  labels:
+    app: ai-service
+spec:
+  type: ClusterIP
+  selector:
+    app: ai-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
