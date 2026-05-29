@@ -297,50 +297,40 @@ class ReportService:
     # =============================================
     # 캐시 헬퍼
     # =============================================
-    def _get_from_cache(self, cache_key: str) -> Optional[ReportResponse]:
-        """
-        Redis 캐시 조회.
-        - Redis 없음: None 반환 → DB 조회로 fallback
-        - 연결 실패: None 반환 → DB 조회로 fallback
-        - 데이터 손상: 캐시 삭제 후 None 반환 → DB 재조회
-        """
-        client = get_redis_client()
-        if not client:
-            return None
+    # 수정 후 - Redis 없으면 예외 발생
+    def _get_from_cache(self, cache_key: str):
+        client = get_redis_client()  # 실패 시 예외 발생
         try:
             cached = client.get(cache_key)
             if not cached:
                 return None
             return ReportResponse(**json.loads(cached))
-        except json.JSONDecodeError as e:
-            # 캐시 데이터 손상 → 삭제 후 DB 재조회
-            logger.error(f"[ReportService] 캐시 손상 - key={cache_key}, error={e}")
-            try:
-                client.delete(cache_key)
-            except Exception as e:
-                logger.warning(f"[ReportService] 손상 캐시 삭제 실패 - key={cache_key}, error={e}")
-            return None
+        except BusinessException:
+            raise  # Redis 연결 에러는 그대로 올림
         except Exception as e:
-            # Redis 연결 실패 등 → DB 조회로 fallback (서비스 중단 없음)
-            logger.error(f"[ReportService] Redis 조회 실패 (DB fallback) - key={cache_key}, error={e}")
-            return None
+            logger.error(f"[ReportService] 캐시 조회 실패 - key={cache_key}, error={e}")
+            raise BusinessException(ErrorCode.REDIS_READ_ERROR)
 
-    def _set_to_cache(self, cache_key: str, response: ReportResponse) -> None:
-        """
-        Redis 캐싱.
-        실패해도 응답은 정상 반환 (캐싱 실패가 서비스 실패로 전파되지 않음).
-        """
+    def _set_to_cache(self, cache_key: str, response):
         client = get_redis_client()
-        if not client:
-            logger.warning("[ReportService] Redis 없음 - 캐싱 스킵")
-            return
         try:
             client.setex(cache_key, REPORT_CACHE_TTL, response.model_dump_json())
-            logger.info(f"[ReportService] 캐시 저장 완료 - key={cache_key}, ttl={REPORT_CACHE_TTL}s")
+        except BusinessException:
+            raise
         except Exception as e:
-            # 캐싱 실패해도 응답은 정상 반환
-            logger.error(f"[ReportService] Redis 캐싱 실패 (서비스 정상) - key={cache_key}, error={e}")
+            logger.error(f"[ReportService] 캐시 저장 실패 - key={cache_key}, error={e}")
+            raise BusinessException(ErrorCode.REDIS_WRITE_ERROR)
 
+    def _acquire_lock(self, lock_key: str) -> bool:
+        client = get_redis_client()
+        try:
+            acquired = client.set(lock_key, "1", nx=True, ex=GENERATING_LOCK_TTL)
+            return bool(acquired)
+        except BusinessException:
+            raise
+        except Exception as e:
+            logger.error(f"[ReportService] 락 획득 실패 - key={lock_key}, error={e}")
+            raise BusinessException(ErrorCode.REDIS_CONNECTION_ERROR)
     def _to_response(self, report: AiReport) -> ReportResponse:
         """AiReport entity → ReportResponse 변환."""
         return ReportResponse(

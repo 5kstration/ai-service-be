@@ -9,9 +9,8 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "claude-haiku-4-5-20251001"
     
     #redis
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
-    
+    REDIS_URL = f"redis://:{os.getenv('REDIS_PASSWORD')}@redis-master.moneylog.svc.cluster.local:6379/0"
+    REDIS_PREFIX = "ai:" 
     # AWS
     AWS_REGION: str            = "ap-northeast-2"
     AWS_ACCESS_KEY_ID: str     = ""
