@@ -1,0 +1,102 @@
+pipeline {
+    agent {
+        label 'onprem-agent'
+    }
+
+    options {
+        timeout(time: 45, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        ansiColor('xterm')
+    }
+
+    environment {
+        AWS_REGION       = 'ap-northeast-2'
+        AWS_ACCOUNT_ID   = '525089404962'
+        ECR_REGISTRY     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_NAME       = 'ai-service-be'
+        IMAGE_TAG        = "${BUILD_NUMBER}"
+        EKS_CLUSTER_NAME = 'oka-eks'
+        AWS_CRED_ID      = 'aws-iam-jenkins-user-key'
+        K8S_NAMESPACE    = 'moneylog'
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                echo 'Checking out source...'
+                checkout scm
+            }
+        }
+
+        // Python은 별도 빌드 없이 Docker 이미지 빌드 시 pip install 처리
+        // Gradle 빌드 스테이지 없음
+
+        stage('AWS ECR Authentication') {
+            steps {
+                echo 'Logging in to ECR...'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: "${AWS_CRED_ID}",
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    sh '''
+                        aws ecr get-login-password --region "$AWS_REGION" | \
+                        docker login --username AWS --password-stdin "$ECR_REGISTRY"
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Build & Push to ECR') {
+            steps {
+                echo 'Building and pushing Docker image...'
+                sh """
+                    docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+                    docker push ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                """
+            }
+        }
+
+        stage('Deploy to AWS EKS') {
+            steps {
+                echo 'Deploying to EKS...'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: "${AWS_CRED_ID}",
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    sh '''
+                        export KUBECONFIG="$WORKSPACE/.kube/config"
+                        mkdir -p "$(dirname "$KUBECONFIG")"
+                        aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --kubeconfig "$KUBECONFIG"
+
+                        # deployment.yaml 이미지 태그 치환
+                        sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" k8s/deployment.yaml
+
+                        # 네임스페이스 없으면 생성
+                        kubectl --kubeconfig "$KUBECONFIG" create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl --kubeconfig "$KUBECONFIG" apply -f -
+                        # k8s 리소스 적용
+                        kubectl --kubeconfig "$KUBECONFIG" apply -f k8s/
+
+                        # 배포 완료 대기
+                        kubectl --kubeconfig "$KUBECONFIG" -n "$K8S_NAMESPACE" rollout status deployment/ai-service --timeout=180s                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning local Docker image cache...'
+            sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
+        }
+        success {
+            echo 'EKS deployment succeeded.'
+        }
+        failure {
+            echo 'Deployment failed. Check the pipeline logs.'
+        }
+    }
+}

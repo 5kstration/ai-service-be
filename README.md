@@ -35,20 +35,14 @@
 |------|------|
 | Main DB | PostgreSQL 16 (AI 인사이트, 추천 결과, 북마크 저장) |
 | ORM | SQLAlchemy 2.0.36 |
-| Vector DB | Qdrant (청년 정책 벡터 임베딩 저장 및 유사도 검색) |
-| Message Broker | NATS JetStream (비동기 이벤트 구동 처리) |
-| LLM API | Anthropic Claude API (anthropic 0.34.0) |
+| Vector DB | pgvector (청년 정책 벡터 임베딩 저장 및 유사도 검색) |
+| Message Broker | AWS SQS (비동기 이벤트 구동 처리) |
+| LLM API | Anthropic Claude API |
 | HTTP Client | httpx 0.27.0 (내부 서비스 간 통신) |
 
 ### Architecture & Patterns
 
-- **Layered Architecture**: MVC 계층 분리 (router → service → repository). Entity의 프리젠테이션 계층 노출 금지
-- **Standard Responses**: 모든 API 응답은 `CommonResponse[T]` Pydantic 모델로 일관되게 래핑
-- **Data Transfer Objects**: Pydantic BaseModel을 활용한 요청/응답 스키마 분리
-- **TSID**: 직접 구현한 TSID 생성기로 PK 관리 (`app/core/utils/tsid.py`), Java 서비스와 포맷 통일
-- **비식별화**: LLM 호출 전 userId SHA-256 해싱, 가맹점명 카테고리 대체, 금액 반올림 처리
-- **벡터 검색**: 청년 정책 데이터를 Qdrant에 임베딩하여 사용자 조건 기반 유사도 검색
-- **Communication**: 동기 호출 시 httpx + 서킷 브레이커 패턴 적용. 비동기 이벤트 통신에는 NATS JetStream 활용
+
 
 ---
 
