@@ -1,0 +1,205 @@
+{
+  "timestamp": "2026-05-26T23:44:59.516401",
+  "stage": "1단계_순수벡터검색",
+  "k": 3,
+  "user_count": 3,
+  "per_user": {
+    "01HXGT000000000001": {
+      "user_name": "식비_교통_중심",
+      "scores": {
+        "cards": {
+          "hit_rate@3": 0.3333,
+          "precision@3": 0.3333,
+          "ndcg@3": 0.2961,
+          "mrr": 0.5,
+          "recommended": [
+            "신한 Hey Young 카드",
+            "KB 청춘대로 TOK TOK카드",
+            "신한 Mr.Life 카드"
+          ],
+          "ground_truth": [
+            "신한 Deep Dream 카드",
+            "하나 1Q카드",
+            "KB 청춘대로 TOK TOK카드"
+          ],
+          "hits": [
+            "KB 청춘대로 TOK TOK카드"
+          ]
+        },
+        "insurances": {
+          "hit_rate@3": 0.0,
+          "precision@3": 0.0,
+          "ndcg@3": 0.0,
+          "mrr": 0.0,
+          "recommended": [
+            "한화 온라인 종신보험",
+            "AIA 건강보험 스마트케어",
+            "현대해상 Green우산어린이보험"
+          ],
+          "ground_truth": [
+            "삼성화재 애니핏 플러스",
+            "현대해상 운전자보험 플러스"
+          ],
+          "hits": []
+        },
+        "policies": {
+          "hit_rate@3": 0.0,
+          "precision@3": 0.0,
+          "ndcg@3": 0.0,
+          "mrr": 0.0,
+          "recommended": [
+            "청년 월세 지원",
+            "청년 구직촉진수당",
+            "청년 직장체험 프로그램"
+          ],
+          "ground_truth": [
+            "청년 교통비 지원",
+            "청년희망적금",
+            "내일배움카드"
+          ],
+          "hits": []
+        },
+        "overall": {
+          "avg_hit_rate@3": 0.1111,
+          "avg_precision@3": 0.1111,
+          "avg_ndcg@3": 0.0987,
+          "avg_mrr": 0.1667
+        }
+      }
+    },
+    "01HXGT000000000002": {
+      "user_name": "쇼핑_카페_중심",
+      "scores": {
+        "cards": {
+          "hit_rate@3": 0.0,
+          "precision@3": 0.0,
+          "ndcg@3": 0.0,
+          "mrr": 0.0,
+          "recommended": [
+            "신한 Hey Young 카드",
+            "신한 S-Line 카드",
+            "현대카드 Z Work"
+          ],
+          "ground_truth": [
+            "NH올원 e카드",
+            "신한 Deep Dream 카드",
+            "KB 청춘대로 TOK TOK카드"
+          ],
+          "hits": []
+        },
+        "insurances": {
+          "hit_rate@3": 0.0,
+          "precision@3": 0.0,
+          "ndcg@3": 0.0,
+          "mrr": 0.0,
+          "recommended": [
+            "AIA 건강보험 스마트케어",
+            "한화 온라인 종신보험",
+            "AIA 무배당 건강종신"
+          ],
+          "ground_truth": [
+            "삼성화재 애니핏 플러스",
+            "KB 암보험 다이렉트"
+          ],
+          "hits": []
+        },
+        "policies": {
+          "hit_rate@3": 0.3333,
+          "precision@3": 0.3333,
+          "ndcg@3": 0.2961,
+          "mrr": 0.5,
+          "recommended": [
+            "청년 직장체험 프로그램",
+            "청년 월세 지원",
+            "청년 일경험 프로그램"
+          ],
+          "ground_truth": [
+            "청년 월세 지원",
+            "청년희망적금",
+            "서울 청년 수당"
+          ],
+          "hits": [
+            "청년 월세 지원"
+          ]
+        },
+        "overall": {
+          "avg_hit_rate@3": 0.1111,
+          "avg_precision@3": 0.1111,
+          "avg_ndcg@3": 0.0987,
+          "avg_mrr": 0.1667
+        }
+      }
+    },
+    "01HXGT000000000003": {
+      "user_name": "저소득_주거_중심",
+      "scores": {
+        "cards": {
+          "hit_rate@3": 0.3333,
+          "precision@3": 0.3333,
+          "ndcg@3": 0.2346,
+          "mrr": 0.3333,
+          "recommended": [
+            "KB 청춘대로 TOK TOK카드",
+            "신한 Hey Young 카드",
+            "신한 Mr.Life 카드"
+          ],
+          "ground_truth": [
+            "신한 Mr.Life 카드",
+            "신한 Deep Dream 카드",
+            "하나 1Q카드"
+          ],
+          "hits": [
+            "신한 Mr.Life 카드"
+          ]
+        },
+        "insurances": {
+          "hit_rate@3": 0.0,
+          "precision@3": 0.0,
+          "ndcg@3": 0.0,
+          "mrr": 0.0,
+          "recommended": [
+            "한화 온라인 종신보험",
+            "현대해상 Green우산어린이보험",
+            "KB 다이렉트 자동차보험"
+          ],
+          "ground_truth": [
+            "라이프플러스 실손보험",
+            "현대해상 운전자보험 플러스"
+          ],
+          "hits": []
+        },
+        "policies": {
+          "hit_rate@3": 0.3333,
+          "precision@3": 0.3333,
+          "ndcg@3": 0.4693,
+          "mrr": 1.0,
+          "recommended": [
+            "청년 월세 지원",
+            "청년 취업 지원금",
+            "청년 구직촉진수당"
+          ],
+          "ground_truth": [
+            "청년 월세 지원",
+            "청년 전세임대주택",
+            "청년 주거급여 분리지급"
+          ],
+          "hits": [
+            "청년 월세 지원"
+          ]
+        },
+        "overall": {
+          "avg_hit_rate@3": 0.2222,
+          "avg_precision@3": 0.2222,
+          "avg_ndcg@3": 0.2346,
+          "avg_mrr": 0.4444
+        }
+      }
+    }
+  },
+  "overall": {
+    "hit_rate@3": 0.1481,
+    "precision@3": 0.1481,
+    "ndcg@3": 0.144,
+    "mrr": 0.2593
+  }
+}
