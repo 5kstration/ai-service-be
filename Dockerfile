@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.9.23-slim
 WORKDIR /app
 
 # 의존성 먼저 복사 (캐시 활용)
