@@ -8,9 +8,12 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     LLM_MODEL: str = "claude-haiku-4-5-20251001"
     
-    #redis
-    REDIS_URL = f"redis://:{os.getenv('REDIS_PASSWORD')}@redis-master.moneylog.svc.cluster.local:6379/0"
-    REDIS_PREFIX = "ai:" 
+   # redis
+    REDIS_HOST: str = "redis-master.moneylog.svc.cluster.local"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""
+    REDIS_PREFIX: str = "ai:"
+    
     # AWS
     AWS_REGION: str            = "ap-northeast-2"
     AWS_ACCESS_KEY_ID: str     = ""
