@@ -9,10 +9,13 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "claude-haiku-4-5-20251001"
     
    # redis
-    REDIS_HOST: str = "redis-master.moneylog.svc.cluster.local"
+  # Redis
+    REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str = ""
-    REDIS_PREFIX: str = "ai:"
+    REDIS_SENTINEL_HOST: str = ""        # 비어있으면 직접 연결 (로컬)
+    REDIS_SENTINEL_PORT: int = 26379
+    REDIS_SENTINEL_MASTER: str = "mymaster"
     
     # AWS
     AWS_REGION: str            = "ap-northeast-2"
@@ -20,8 +23,9 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = ""
  
     # SQS
-    SQS_QUEUE_URL: str = ""
-    SQS_ENDPOINT_URL: str = ""  # 로컬: http://localhost:4566, 운영: 빈값
+    SQS_QUEUE_URL: str = ""         # 수신 큐 (AUTH → AI)
+    SQS_PUBLISH_QUEUE_URL: str = "" # 발행 큐 (AI → AUTH), 프로필 업데이트 이벤트
+    SQS_ENDPOINT_URL: str = ""      # 로컬: http://localhost:4566, 운영: 빈값
     
     #raw
     RAW_EXTERNAL_BASE_URL: str = "http://온프렘서버:8081"
