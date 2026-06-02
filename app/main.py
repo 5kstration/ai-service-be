@@ -10,6 +10,7 @@ from app.domain.sync.router import router as sync_router
 from app.domain.recommend_ai.router import router as recommend_ai_router
 from app.core.config.sqs import start_consumers
 from app.core.config.scheduler import setup_scheduler
+from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,7 +23,13 @@ app.include_router(recommend_router,    prefix="/api/recommend",   tags=["Recomm
 app.include_router(insight_router,      prefix="/api/ai",          tags=["Insight"])
 app.include_router(sync_router,                                     tags=["Sync"])
 app.include_router(recommend_ai_router,                             tags=["Recommend AI"])
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health_check():

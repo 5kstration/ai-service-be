@@ -18,6 +18,7 @@ pipeline {
         EKS_CLUSTER_NAME = 'oka-eks'
         AWS_CRED_ID      = 'aws-iam-jenkins-user-key'
         K8S_NAMESPACE    = 'moneylog'
+        GATEWAY_TOKEN    = 'x-gateway-token'
     }
 
     stages {
@@ -61,18 +62,27 @@ pipeline {
         stage('Deploy to AWS EKS') {
             steps {
                 echo 'Deploying to EKS...'
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: "${AWS_CRED_ID}",
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: "${AWS_CRED_ID}",
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ],
+                    string(credentialsId: env.GATEWAY_TOKEN, variable: 'GATEWAY_SECRET_TOKEN')
+                ]) {
                     sh '''
                         export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                         export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                         export AWS_DEFAULT_REGION=$AWS_REGION
 
                         aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+                        # ai-service-secret에 GATEWAY_SECRET_TOKEN 추가/갱신
+                        kubectl create secret generic ai-service-secret \
+                        --namespace=$K8S_NAMESPACE \
+                        --from-literal=GATEWAY_SECRET_TOKEN=$GATEWAY_SECRET_TOKEN \
+                        --dry-run=client -o yaml | kubectl apply -f -
 
                         sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" k8s/deployment.yaml
 
