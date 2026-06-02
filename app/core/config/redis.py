@@ -14,7 +14,7 @@ def _create_redis_client():
         if settings.REDIS_SENTINEL_HOST:
             from redis.sentinel import Sentinel
             sentinel = Sentinel(
-                [(settings.REDIS_SENTINEL_HOST, settings.REDIS_SENTINEL_PORT)],
+                [(settings.REDIS_SENTINEL_HOST, settings.REDIS_SENTINEL_SVC_PORT)],
                 password         = settings.REDIS_PASSWORD,
                 socket_timeout   = 3,
                 decode_responses = True,
