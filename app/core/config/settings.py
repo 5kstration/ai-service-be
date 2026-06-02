@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str = ""
     REDIS_SENTINEL_HOST: str = ""        # 비어있으면 직접 연결 (로컬)
-    REDIS_SENTINEL_PORT: int = 26379
+    REDIS_SENTINEL_SVC_PORT: int = 26379
     REDIS_SENTINEL_MASTER: str = "mymaster"
     
     # AWS
