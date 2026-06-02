@@ -8,9 +8,10 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     LLM_MODEL: str = "claude-haiku-4-5-20251001"
     
-   # redis
-  # Redis
-    REDIS_HOST: str = "localhost"
+    GATEWAY_SECRET_TOKEN: str = ""  
+    
+    # Redis
+    REDIS_HOST: str = ""
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str = ""
     REDIS_SENTINEL_HOST: str = ""        # 비어있으면 직접 연결 (로컬)
@@ -28,7 +29,7 @@ class Settings(BaseSettings):
     SQS_ENDPOINT_URL: str = ""      # 로컬: http://localhost:4566, 운영: 빈값
     
     #raw
-    RAW_EXTERNAL_BASE_URL: str = "http://온프렘서버:8081"
+    RAW_EXTERNAL_BASE_URL: str = "http://10.0.2.62:8081"
     # Bedrock (추천 파이프라인용)
     BEDROCK_EMBED_MODEL: str = "amazon.titan-embed-text-v2:0"
     BEDROCK_LLM_MODEL:   str = "anthropic.claude-haiku-4-5-20251001:0"
