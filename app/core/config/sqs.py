@@ -139,3 +139,47 @@ async def _process_message(sqs, message: dict, handler):
     except Exception as e:
         # 처리 실패 시 삭제 안 함 → visibility timeout 후 재시도
         logger.error(f"[SQS] 메시지 처리 실패 - 재시도 예정. error={e}")
+
+
+# =============================================
+# SQS 메시지 발행 (AI → AUTH)
+# =============================================
+def publish_profile_update(payload: dict) -> bool:
+    """
+    AI 서비스에서 AUTH 서비스로 프로필 업데이트 이벤트 발행.
+    AUTH에서 받는 onboarding 이벤트와 동일한 포맷으로 발행.
+
+    payload 형식 (AUTH가 수신하는 포맷과 동일):
+    {
+        "userId":        "01HXXX...",
+        "monthlyIncome": 3000000,
+        "birth":         "1997-03-15T00:00:00",   # ISO 형식, 없으면 null
+        "sex":           "남자"                    # 없으면 null
+    }
+
+    Returns:
+        True: 발행 성공
+        False: 발행 실패 (서비스 중단 없이 로깅만)
+    """
+    sqs = get_sqs_client()
+    if not sqs:
+        logger.warning("[SQS] 클라이언트 없음 - 프로필 업데이트 발행 스킵")
+        return False
+
+    queue_url = settings.SQS_PUBLISH_QUEUE_URL
+    if not queue_url:
+        logger.warning("[SQS] SQS_PUBLISH_QUEUE_URL 미설정 - 프로필 업데이트 발행 스킵")
+        return False
+
+    try:
+        import json as _json
+        body = _json.dumps(payload, ensure_ascii=False)
+        sqs.send_message(
+            QueueUrl    = queue_url,
+            MessageBody = body,
+        )
+        logger.info(f"[SQS] 프로필 업데이트 발행 완료 - userId={payload.get('userId')}")
+        return True
+    except Exception as e:
+        logger.error(f"[SQS] 프로필 업데이트 발행 실패 - userId={payload.get('userId')}, error={e}")
+        return False
