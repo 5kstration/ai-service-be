@@ -24,7 +24,7 @@ def _create_redis_client():
                 password = settings.REDIS_PASSWORD,
             )
             master.ping()
-            logger.info(f"[Redis] Sentinel 연결 성공 - {settings.REDIS_SENTINEL_HOST}:{settings.REDIS_SENTINEL_PORT}")
+            logger.info(f"[Redis] Sentinel 연결 성공 - {settings.REDIS_SENTINEL_HOST}:{settings.REDIS_SENTINEL_SVC_PORT}")
             return master
 
         # Sentinel 없으면 직접 연결 (로컬)
@@ -42,7 +42,7 @@ def _create_redis_client():
             )
             client = redis.Redis(connection_pool=pool)
             client.ping()
-            logger.info(f"[Redis] 직접 연결 성공 - {settings.REDIS_HOST}:{settings.REDIS_PORT}")
+            logger.info(f"[Redis] 직접 연결 성공 - {settings.REDIS_HOST}:{settings.REDIS_SENTINEL_SVC_PORT}")
             return client
 
     except Exception as e:
