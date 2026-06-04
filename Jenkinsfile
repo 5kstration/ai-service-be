@@ -55,6 +55,8 @@ pipeline {
                 sh """
                     docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
                     docker push ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker tag ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:latest
+                    docker push ${ECR_REGISTRY}/${IMAGE_NAME}:latest
                 """
             }
         }
@@ -71,7 +73,7 @@ pipeline {
                         git config user.name "Jenkins"
                         git add k8s/deployment.yaml
                         git commit -m "ci: update ai-service image tag to ${IMAGE_TAG}"
-                        git push https://${GIT_USER}:${GIT_TOKEN}@gitlab.com/5kstration/ai-service-be.git HEAD:main
+                        git push https://\${GIT_USER}:\${GIT_TOKEN}@gitlab.com/5kstration/ai-service-be.git HEAD:main
                     """
                 }
             }
@@ -82,12 +84,13 @@ pipeline {
         always {
             echo 'Cleaning local Docker image cache...'
             sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
+            sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:latest || true"
         }
         success {
-            echo 'EKS deployment succeeded.'
+            echo 'ArgoCD will handle deployment.'
         }
         failure {
-            echo 'Deployment failed. Check the pipeline logs.'
+            echo 'Pipeline failed. Check the logs.'
         }
     }
 }
