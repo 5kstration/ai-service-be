@@ -15,33 +15,26 @@ pipeline {
         ECR_REGISTRY     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_NAME       = 'ai-service-be'
         IMAGE_TAG        = "${BUILD_NUMBER}"
+        EKS_CLUSTER_NAME = 'oka-eks'
         AWS_CRED_ID      = 'aws-iam-jenkins-user-key'
-        GITLAB_CRED_ID   = 'gitlab-git-credentials'
+        K8S_NAMESPACE    = 'moneylog'
+        GATEWAY_TOKEN    = 'x-gateway-token'
     }
 
     stages {
         stage('Checkout SCM') {
             steps {
-                echo '📦 [소스코드] GitLab 리포지토리로부터 최신 소스코드 동기화...'
+                echo 'Checking out source...'
                 checkout scm
             }
         }
 
-        stage('Check Commit Author') {
-            steps {
-                script {
-                    def author = sh(script: 'git log -1 --pretty=format:%an', returnStdout: true).trim()
-                    if (author == 'Jenkins') {
-                        currentBuild.result = 'NOT_BUILT'
-                        error('Jenkins 자동 커밋 - 빌드 스킵')
-                    }
-                }
-            }
-        }
+        // Python은 별도 빌드 없이 Docker 이미지 빌드 시 pip install 처리
+        // Gradle 빌드 스테이지 없음
 
         stage('AWS ECR Authentication') {
             steps {
-                echo '🔐 [ECR] 로그인...'
+                echo 'Logging in to ECR...'
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: "${AWS_CRED_ID}",
@@ -58,32 +51,45 @@ pipeline {
 
         stage('Docker Build & Push to ECR') {
             steps {
-                echo '🐳 [도커 이미지] 빌드 및 ECR 푸시...'
+                echo 'Building and pushing Docker image...'
                 sh """
                     docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
                     docker push ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker tag ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:latest
-                    docker push ${ECR_REGISTRY}/${IMAGE_NAME}:latest
                 """
             }
         }
 
-        stage('Update Image Tag & Push') {
+        stage('Deploy to AWS EKS') {
             steps {
-                echo '📝 [Git] deployment.yaml 이미지 태그 업데이트 및 커밋...'
-                withCredentials([usernamePassword(
-                    credentialsId: "${GITLAB_CRED_ID}",
-                    usernameVariable: 'GIT_USER',
-                    passwordVariable: 'GIT_TOKEN'
-                )]) {
-                    sh """
-                        sed -i "s|ai-service-be:.*|ai-service-be:${IMAGE_TAG}|g" k8s/deployment.yaml
-                        git config user.email "jenkins@moneylog.com"
-                        git config user.name "Jenkins"
-                        git add k8s/deployment.yaml
-                        git commit -m "ci: update ai-service image tag to ${IMAGE_TAG}"
-                        git push https://\${GIT_USER}:\${GIT_TOKEN}@gitlab.com/5kstration/ai-service-be.git HEAD:main
-                    """
+                echo 'Deploying to EKS...'
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: "${AWS_CRED_ID}",
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ],
+                    string(credentialsId: env.GATEWAY_TOKEN, variable: 'GATEWAY_SECRET_TOKEN')
+                ]) {
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=$AWS_REGION
+
+                        aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+                        # ai-service-secret에 GATEWAY_SECRET_TOKEN 추가/갱신
+                        kubectl create secret generic ai-service-secret \
+                        --namespace=$K8S_NAMESPACE \
+                        --from-literal=GATEWAY_SECRET_TOKEN=$GATEWAY_SECRET_TOKEN \
+                        --dry-run=client -o yaml | kubectl apply -f -
+
+                        sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" k8s/deployment.yaml
+
+                        kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - --validate=false
+                        kubectl apply -f k8s/ --validate=false
+                        kubectl -n "$K8S_NAMESPACE" rollout status deployment/ai-service --timeout=180s
+                    '''
                 }
             }
         }
@@ -91,17 +97,14 @@ pipeline {
 
     post {
         always {
-            echo '🧹 [인프라 정리] 로컬 도커 이미지 캐시 삭제...'
-            sh """
-                docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true
-                docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:latest || true
-            """
+            echo 'Cleaning local Docker image cache...'
+            sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
         }
         success {
-            echo '✅ ArgoCD가 EKS 배포를 처리합니다.'
+            echo 'EKS deployment succeeded.'
         }
         failure {
-            echo '❌ 파이프라인 실패. 로그를 확인하십시오.'
+            echo 'Deployment failed. Check the pipeline logs.'
         }
     }
 }
