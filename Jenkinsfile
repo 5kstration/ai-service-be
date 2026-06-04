@@ -63,7 +63,7 @@ pipeline {
         stage('Update Image Tag & Push') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'gitlab-token',
+                    credentialsId: 'gitlab-git-credentials',
                     usernameVariable: 'GIT_USER',
                     passwordVariable: 'GIT_TOKEN'
                 )]) {
