@@ -38,9 +38,12 @@ def health_check():
 
 @app.on_event("startup")
 async def startup():
-    # SQS consumer 시작
+    # Vector DB 테이블 생성
+    from app.core.config.vector_database import VectorBase, vector_engine
+    from app.domain.recommend_ai.entity import ProductEmbedding  # noqa
+    VectorBase.metadata.create_all(bind=vector_engine)
+
     await start_consumers()
-    # 배치 스케줄러 시작
     setup_scheduler()
 
 
