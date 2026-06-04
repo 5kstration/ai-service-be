@@ -464,15 +464,15 @@ def llm_recommend_node(state: RecommendState) -> dict:
 - 나이가 25세이고 대중교통 이용이 잦을 수 있으므로 B정책(청년 교통비 지원) 적합. 단 C정책과 중복 불가.
 </thinking>
 ```json
-{
+{{
   "cards": [
-    {"key": "01HXPRODCARD00000001", "reason": "이번 달 식비에 가장 많은 금액을 쓰셨네요! 이 카드로 배달앱과 음식점 할인을 받으면 식비를 크게 절약할 수 있어요."}
+    {{"key": "01HXPRODCARD00000001", "reason": "이번 달 식비에 가장 많은 금액을 쓰셨네요!"}}
   ],
   "insurances": [],
   "policies": [
-    {"key": "01HXPRODPOL000000021", "reason": "매일 출퇴근하시는 25세 청년에게 딱 맞는 교통비 지원 정책이에요. 단, [C정책]과는 중복 신청이 안 돼요. 둘 중 하나만 선택하세요!"}
+    {{"key": "01HXPRODPOL000000021", "reason": "매일 출퇴근하시는 25세 청년에게 딱 맞는 교통비 지원 정책이에요."}}
   ]
-}
+}}
 ```"""
 
         response_text = bedrock_client.recommend(prompt)

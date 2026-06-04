@@ -58,38 +58,21 @@ pipeline {
                 """
             }
         }
-
-        stage('Deploy to AWS EKS') {
+        stage('Update Image Tag & Push') {
             steps {
-                echo 'Deploying to EKS...'
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${AWS_CRED_ID}",
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ],
-                    string(credentialsId: env.GATEWAY_TOKEN, variable: 'GATEWAY_SECRET_TOKEN')
-                ]) {
-                    sh '''
-                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        export AWS_DEFAULT_REGION=$AWS_REGION
-
-                        aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-
-                        # ai-service-secret에 GATEWAY_SECRET_TOKEN 추가/갱신
-                        kubectl create secret generic ai-service-secret \
-                        --namespace=$K8S_NAMESPACE \
-                        --from-literal=GATEWAY_SECRET_TOKEN=$GATEWAY_SECRET_TOKEN \
-                        --dry-run=client -o yaml | kubectl apply -f -
-
-                        sed -i "s|IMAGE_TAG_PLACEHOLDER|$IMAGE_TAG|g" k8s/deployment.yaml
-
-                        kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - --validate=false
-                        kubectl apply -f k8s/ --validate=false
-                        kubectl -n "$K8S_NAMESPACE" rollout status deployment/ai-service --timeout=180s
-                    '''
+                withCredentials([usernamePassword(
+                    credentialsId: 'gitlab-token',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_TOKEN'
+                )]) {
+                    sh """
+                        sed -i "s|ai-service-be:.*|ai-service-be:${IMAGE_TAG}|g" k8s/deployment.yaml
+                        git config user.email "jenkins@moneylog.com"
+                        git config user.name "Jenkins"
+                        git add k8s/deployment.yaml
+                        git commit -m "ci: update ai-service image tag to ${IMAGE_TAG}"
+                        git push https://${GIT_USER}:${GIT_TOKEN}@gitlab.com/5kstration/ai-service-be.git HEAD:main
+                    """
                 }
             }
         }
