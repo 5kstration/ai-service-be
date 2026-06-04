@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: ai-service
-          image: 525089404962.dkr.ecr.ap-northeast-2.amazonaws.com/ai-service-be:149
+          image: 525089404962.dkr.ecr.ap-northeast-2.amazonaws.com/ai-service-be:150
           ports:
             - containerPort: 8000
           envFrom:
