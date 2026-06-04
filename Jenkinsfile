@@ -25,6 +25,18 @@ pipeline {
             }
         }
 
+        stage('Check Commit Author') {
+            steps {
+                script {
+                    def author = sh(script: 'git log -1 --pretty=format:%an', returnStdout: true).trim()
+                    if (author == 'Jenkins') {
+                        currentBuild.result = 'NOT_BUILT'
+                        error('Jenkins 자동 커밋 - 빌드 스킵')
+                    }
+                }
+            }
+        }
+
         stage('Backend Build & Test') {
             steps {
                 echo '☕ [컴파일] jar 패키징 및 테스트 수행...'
