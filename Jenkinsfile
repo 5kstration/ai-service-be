@@ -1,79 +1,77 @@
 pipeline {
-    agent {
-        label 'onprem-agent'
+    agent { 
+        label 'onprem-agent' 
     }
 
     options {
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 30, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
         ansiColor('xterm')
     }
 
     environment {
-        AWS_REGION       = 'ap-northeast-2'
-        AWS_ACCOUNT_ID   = '525089404962'
-        ECR_REGISTRY     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        IMAGE_NAME       = 'ai-service-be'
-        IMAGE_TAG        = "${BUILD_NUMBER}"
-        EKS_CLUSTER_NAME = 'oka-eks'
-        AWS_CRED_ID      = 'aws-iam-jenkins-user-key'
-        K8S_NAMESPACE    = 'moneylog'
-        GATEWAY_TOKEN    = 'x-gateway-token'
+        REGISTRY                 = 'registry.gitlab.com'
+        IMAGE_NAME               = '5kstration/alarm-service-be'
+        IMAGE_TAG                = "${env.BUILD_NUMBER}"
+        REGISTRY_CRED_ID         = 'gitlab-registry-credentials'
+        GITLAB_CRED_ID           = 'gitlab-git-credentials'
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Clone Repository') {
             steps {
-                echo 'Checking out source...'
+                echo '📦 [소스코드] GitLab 리포지토리로부터 최신 소스코드 동기화...'
                 checkout scm
             }
         }
 
-        // Python은 별도 빌드 없이 Docker 이미지 빌드 시 pip install 처리
-        // Gradle 빌드 스테이지 없음
-
-        stage('AWS ECR Authentication') {
+        stage('Backend Build & Test') {
             steps {
-                echo 'Logging in to ECR...'
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: "${AWS_CRED_ID}",
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                ]]) {
-                    sh '''
-                        aws ecr get-login-password --region "$AWS_REGION" | \
-                        docker login --username AWS --password-stdin "$ECR_REGISTRY"
-                    '''
+                echo '☕ [컴파일] jar 패키징 및 테스트 수행...'
+                sh './gradlew clean bootJar'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                echo '🔍 [코드 품질] SonarQube 정적 코드 분석 수행...'
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withSonarQubeEnv('SonarQube-Server') {
+                        sh './gradlew sonar'
+                    }
+                    timeout(time: 5, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: true
+                    }
                 }
             }
         }
 
-        stage('Docker Build & Push to ECR') {
+        stage('Docker Build & Push to GitLab Registry') {
             steps {
-                echo 'Building and pushing Docker image...'
-                sh """
-                    docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
-                    docker push ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker tag ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REGISTRY}/${IMAGE_NAME}:latest
-                    docker push ${ECR_REGISTRY}/${IMAGE_NAME}:latest
-                """
+                echo '🐳 [도커 이미지] 빌드 및 GitLab Registry 푸시...'
+                withCredentials([usernamePassword(credentialsId: "${REGISTRY_CRED_ID}", usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                    sh """
+                        docker build -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+                        docker tag ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
+                        docker login -u ${REG_USER} -p ${REG_PASS} ${REGISTRY}
+                        docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
+                    """
+                }
             }
         }
+
         stage('Update Image Tag & Push') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'gitlab-git-credentials',
-                    usernameVariable: 'GIT_USER',
-                    passwordVariable: 'GIT_TOKEN'
-                )]) {
+                echo '📝 [Git] deployment.yaml 이미지 태그 업데이트 및 커밋...'
+                withCredentials([usernamePassword(credentialsId: "${GITLAB_CRED_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
                     sh """
-                        sed -i "s|ai-service-be:.*|ai-service-be:${IMAGE_TAG}|g" k8s/deployment.yaml
+                        sed -i "s|alarm-service-be:.*|alarm-service-be:${IMAGE_TAG}|g" k8s/deployment.yaml
                         git config user.email "jenkins@moneylog.com"
                         git config user.name "Jenkins"
                         git add k8s/deployment.yaml
-                        git commit -m "ci: update ai-service image tag to ${IMAGE_TAG}"
-                        git push https://\${GIT_USER}:\${GIT_TOKEN}@gitlab.com/5kstration/ai-service-be.git HEAD:main
+                        git commit -m "ci: update alarm-service image tag to ${IMAGE_TAG}"
+                        git push https://\${GIT_USER}:\${GIT_TOKEN}@gitlab.com/5kstration/alarm-service-BE.git HEAD:main
                     """
                 }
             }
@@ -82,15 +80,17 @@ pipeline {
 
     post {
         always {
-            echo 'Cleaning local Docker image cache...'
-            sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
-            sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:latest || true"
+            echo '🧹 [인프라 정리] 로컬 도커 이미지 캐시 삭제...'
+            sh """
+                docker rmi ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true
+                docker rmi ${REGISTRY}/${IMAGE_NAME}:latest || true
+            """
         }
         success {
-            echo 'ArgoCD will handle deployment.'
+            echo '✅ ArgoCD가 온프렘 k8s 배포를 처리합니다.'
         }
         failure {
-            echo 'Pipeline failed. Check the logs.'
+            echo '❌ 파이프라인 실패. 로그를 확인하십시오.'
         }
     }
 }
