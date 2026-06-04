@@ -29,8 +29,19 @@ pipeline {
             }
         }
 
-        // Python은 별도 빌드 없이 Docker 이미지 빌드 시 pip install 처리
-        // Gradle 빌드 스테이지 없음
+        stage('SonarQube Analysis') {
+            steps {
+                echo '🔍 [코드 품질] SonarQube 정적 코드 분석 수행...'
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withSonarQubeEnv('SonarQube-Server') {
+                        sh 'sonar-scanner'
+                    }
+                    timeout(time: 5, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: true
+                    }
+                }
+            }
+        }
 
         stage('AWS ECR Authentication') {
             steps {
@@ -78,7 +89,6 @@ pipeline {
 
                         aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
 
-                        # ai-service-secret에 GATEWAY_SECRET_TOKEN 추가/갱신
                         kubectl create secret generic ai-service-secret \
                         --namespace=$K8S_NAMESPACE \
                         --from-literal=GATEWAY_SECRET_TOKEN=$GATEWAY_SECRET_TOKEN \
