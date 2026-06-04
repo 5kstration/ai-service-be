@@ -29,19 +29,22 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                echo '🔍 [코드 품질] SonarQube 정적 코드 분석 수행...'
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withSonarQubeEnv('SonarQube-Server') {
-                        sh 'sonar-scanner'
+    stage('SonarQube Analysis') {
+        steps {
+            echo '🔍 [코드 품질] SonarQube 정적 코드 분석 수행...'
+            catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                withSonarQubeEnv('SonarQube-Server') {
+                    script {
+                        def scannerHome = tool 'py-sonar'
+                        sh "${scannerHome}/bin/sonar-scanner"
                     }
-                    timeout(time: 5, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
-                    }
+                }
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
+    }
 
         stage('AWS ECR Authentication') {
             steps {
