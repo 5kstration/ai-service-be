@@ -145,6 +145,54 @@ def _sync_policy(policy: PolicyProduct) -> None:
         )
 
 
+# 카드/보험 혜택 키워드 → Category 매핑
+BENEFIT_CATEGORY_MAP = {
+    # 카드 혜택 키워드
+    "외식": "생활지원", "식비": "생활지원", "배달": "생활지원",
+    "카페": "문화/여가", "커피": "문화/여가",
+    "교통": "생활지원", "대중교통": "생활지원", "주유": "생활지원",
+    "쇼핑": "생활지원", "백화점": "생활지원",
+    "여행": "문화/여가", "해외": "문화/여가", "항공": "문화/여가",
+    "적립": "금융", "포인트": "금융", "캐시백": "금융",
+    "저축": "금융", "연금": "금융", "자산": "금융",
+    "영화": "문화/여가", "공연": "문화/여가", "OTT": "문화/여가",
+    "통신": "생활지원", "편의점": "생활지원",
+    # 보험 혜택 키워드
+    "실손": "건강", "의료": "건강", "입원": "건강", "수술": "건강",
+    "암": "건강", "건강": "건강", "치과": "건강", "치아": "건강",
+    "자동차": "생활지원", "운전자": "생활지원",
+    "종신": "금융", "사망": "금융",
+    "펫": "생활지원", "반려": "생활지원",
+}
+
+BENEFIT_TAG_MAP = {
+    "외식": "외식할인", "카페": "카페할인", "교통": "교통할인",
+    "주유": "주유할인", "쇼핑": "쇼핑할인", "여행": "여행혜택",
+    "적립": "포인트적립", "캐시백": "캐시백", "통신": "통신할인",
+    "실손": "실손보험", "의료": "의료보장", "암": "암보험",
+    "자동차": "자동차보험", "운전자": "운전자보험",
+    "연금": "연금보험", "저축": "저축보험",
+}
+
+def _extract_categories_from_benefit(top_benefit: str, benefits: str) -> list[str]:
+    """혜택 텍스트에서 카테고리 추출."""
+    combined = f"{top_benefit} {benefits or ''}"
+    categories = set()
+    for keyword, category in BENEFIT_CATEGORY_MAP.items():
+        if keyword in combined:
+            categories.add(category)
+    return list(categories)
+
+def _extract_tags_from_benefit(top_benefit: str, benefits: str) -> list[str]:
+    """혜택 텍스트에서 태그 추출."""
+    combined = f"{top_benefit} {benefits or ''}"
+    tags = set()
+    for keyword, tag in BENEFIT_TAG_MAP.items():
+        if keyword in combined:
+            tags.add(tag)
+    return list(tags)
+
+
 def _sync_card(card: CardProduct) -> None:
     _run_write(
         """
@@ -158,6 +206,30 @@ def _sync_card(card: CardProduct) -> None:
         name=card.card_name or "",
         top_benefit=card.top_benefit or "",
     )
+
+    # 카테고리 연결
+    for category in _extract_categories_from_benefit(card.top_benefit or "", card.benefits or ""):
+        _run_write(
+            """
+            MATCH (c:Card {key: $key})
+            MERGE (cat:Category {name: $category})
+            MERGE (c)-[:IN_CATEGORY]->(cat)
+            """,
+            key=card.key,
+            category=category,
+        )
+
+    # 태그 연결
+    for tag in _extract_tags_from_benefit(card.top_benefit or "", card.benefits or ""):
+        _run_write(
+            """
+            MATCH (c:Card {key: $key})
+            MERGE (t:Tag {name: $tag})
+            MERGE (c)-[:TAGGED_WITH]->(t)
+            """,
+            key=card.key,
+            tag=tag,
+        )
 
 
 def _sync_insurance(ins: InsuranceProduct) -> None:
@@ -173,6 +245,30 @@ def _sync_insurance(ins: InsuranceProduct) -> None:
         name=ins.insurance_name or "",
         top_benefit=ins.top_benefit or "",
     )
+
+    # 카테고리 연결
+    for category in _extract_categories_from_benefit(ins.top_benefit or "", ins.benefits or ""):
+        _run_write(
+            """
+            MATCH (i:Insurance {key: $key})
+            MERGE (cat:Category {name: $category})
+            MERGE (i)-[:IN_CATEGORY]->(cat)
+            """,
+            key=ins.key,
+            category=category,
+        )
+
+    # 태그 연결
+    for tag in _extract_tags_from_benefit(ins.top_benefit or "", ins.benefits or ""):
+        _run_write(
+            """
+            MATCH (i:Insurance {key: $key})
+            MERGE (t:Tag {name: $tag})
+            MERGE (i)-[:TAGGED_WITH]->(t)
+            """,
+            key=ins.key,
+            tag=tag,
+        )
 
 
 def _sync_similar_edges(product_type: str, top_k: int) -> int:
