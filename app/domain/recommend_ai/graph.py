@@ -1,5 +1,4 @@
-# app/domain/recommend_ai/graph.py 전체 교체
-
+# app/domain/recommend_ai/graph.py
 import asyncio
 import logging
 from langgraph.graph import StateGraph, START, END
@@ -8,7 +7,7 @@ from app.domain.recommend_ai.nodes import (
     profile_node,
     embed_node,
     vector_search_node,
-    rerank_node,          # 추가
+    rerank_node,
     filter_node,
     graph_expand_node,
     conflict_node,
@@ -26,18 +25,16 @@ def _has_error(state: RecommendState) -> str:
 def build_recommend_graph():
     graph = StateGraph(RecommendState)
 
-    # 노드 등록
     graph.add_node("profile",       profile_node)
     graph.add_node("embed",         embed_node)
     graph.add_node("vector_search", vector_search_node)
-    graph.add_node("rerank",        rerank_node)       # 추가
+    graph.add_node("rerank",        rerank_node)
     graph.add_node("filter",        filter_node)
     graph.add_node("graph_expand",  graph_expand_node)
     graph.add_node("conflict",      conflict_node)
     graph.add_node("llm",           llm_recommend_node)
     graph.add_node("save",          save_node)
 
-    # 엣지
     graph.add_edge(START, "profile")
 
     graph.add_conditional_edges(
@@ -50,11 +47,11 @@ def build_recommend_graph():
     )
     graph.add_conditional_edges(
         "vector_search", _has_error,
-        {"save": "save", "continue": "rerank"},        # vector_search → rerank
+        {"save": "save", "continue": "rerank"},
     )
     graph.add_conditional_edges(
         "rerank", _has_error,
-        {"save": "save", "continue": "filter"},        # rerank → filter
+        {"save": "save", "continue": "filter"},
     )
     graph.add_conditional_edges(
         "filter",
@@ -71,10 +68,8 @@ def build_recommend_graph():
     )
     graph.add_conditional_edges(
         "llm", _has_error,
-        {"save": END, "continue": "save"},  # 에러 시 저장 스킵
+        {"save": END, "continue": "save"},
     )
-
-
     graph.add_edge("save", END)
 
     return graph.compile()
@@ -90,8 +85,18 @@ def get_recommend_graph():
     return _recommend_graph
 
 
-async def run_recommend_pipeline(user_id: str) -> dict:
-    logger.info(f"[RecommendGraph] 파이프라인 시작 - user_id={user_id}")
+async def run_recommend_pipeline(
+    user_id: str,
+    disable_neo4j: bool = False,
+    disable_rerank: bool = False,
+    disable_income_filter: bool = False,
+) -> dict:
+    logger.info(
+        f"[RecommendGraph] 파이프라인 시작 - user_id={user_id} "
+        f"[neo4j={'OFF' if disable_neo4j else 'ON'} "
+        f"rerank={'OFF' if disable_rerank else 'ON'} "
+        f"income_filter={'OFF' if disable_income_filter else 'ON'}]"
+    )
 
     initial_state: RecommendState = {
         "user_id":                user_id,
@@ -112,6 +117,10 @@ async def run_recommend_pipeline(user_id: str) -> dict:
         "recommended_insurances": [],
         "recommended_policies":   [],
         "error":                  None,
+        # Ablation 플래그
+        "disable_neo4j":         disable_neo4j,
+        "disable_rerank":        disable_rerank,
+        "disable_income_filter": disable_income_filter,
     }
 
     try:

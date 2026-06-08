@@ -1,0 +1,69 @@
+{
+  "timestamp": "2026-06-07T21:27:20.632462",
+  "stages": [
+    {
+      "stage": "Vector Only",
+      "cosine": 0.2665,
+      "faithfulness": 0.5933,
+      "ild": 0.5583,
+      "llm_judge": 55.1,
+      "breakdown": {
+        "relevance": 21.0,
+        "faithfulness": 17.9,
+        "eligibility": 7.5,
+        "diversity": 8.0
+      },
+      "avg_latency_sec": 0.01,
+      "conflict_detected": 0,
+      "failed": []
+    },
+    {
+      "stage": "Vector + Neo4j",
+      "cosine": 0.245,
+      "faithfulness": 0.5379,
+      "ild": 0.4691,
+      "llm_judge": 50.8,
+      "breakdown": {
+        "relevance": 18.8,
+        "faithfulness": 14.2,
+        "eligibility": 8.0,
+        "diversity": 9.2
+      },
+      "avg_latency_sec": 0.01,
+      "conflict_detected": 0,
+      "failed": []
+    },
+    {
+      "stage": "Vector + Neo4j + Reranker",
+      "cosine": 0.2723,
+      "faithfulness": 0.7481,
+      "ild": 0.6093,
+      "llm_judge": 60.2,
+      "breakdown": {
+        "relevance": 24.7,
+        "faithfulness": 17.0,
+        "eligibility": 12.2,
+        "diversity": 8.0
+      },
+      "avg_latency_sec": 0.01,
+      "conflict_detected": 5,
+      "failed": []
+    },
+    {
+      "stage": "Full Pipeline",
+      "cosine": 0.2844,
+      "faithfulness": 0.7517,
+      "ild": 0.6017,
+      "llm_judge": 66.6,
+      "breakdown": {
+        "relevance": 28.2,
+        "faithfulness": 19.1,
+        "eligibility": 12.4,
+        "diversity": 8.4
+      },
+      "avg_latency_sec": 0.01,
+      "conflict_detected": 2,
+      "failed": []
+    }
+  ]
+}

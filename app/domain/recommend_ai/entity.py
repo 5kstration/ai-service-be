@@ -12,6 +12,6 @@ class ProductEmbedding(VectorBase):
     id           = Column(String(26),  primary_key=True, nullable=False)
     product_id   = Column(String(26),  nullable=False)
     product_type = Column(String(20),  nullable=False)  # card, insurance, policy
-    embedding    = Column(Vector(1024), nullable=True)
+    embedding    = Column(Vector(256), nullable=True)
     content      = Column(Text,         nullable=True)  # 임베딩한 원본 텍스트
     created_at   = Column(DateTime,     nullable=False, server_default=func.now())
