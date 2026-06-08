@@ -102,3 +102,16 @@ def _upsert_category(db, user_id, year, month, category, amount_delta):
             category   = category,
             amount     = max(amount_delta, 0),
         ))
+
+    # ratio 재계산 (전체 카테고리 합 대비 비율)
+    db.flush()
+    all_rows = db.query(MonthlySummary).filter(
+        MonthlySummary.user_id == user_id,
+        MonthlySummary.year    == year,
+        MonthlySummary.month   == month,
+    ).all()
+
+    total = sum(r.amount or 0 for r in all_rows)
+    if total > 0:
+        for r in all_rows:
+            r.ratio = round((r.amount or 0) / total * 100, 2)
