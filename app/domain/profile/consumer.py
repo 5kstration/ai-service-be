@@ -1,86 +1,107 @@
-# app/domain/profile/consumer.py
-# SQS 온보딩 이벤트 수신 → user_profile 저장 → 추천 파이프라인 실행
-
+# app/domain/budget/consumer.py
 import json
 import logging
-from datetime import datetime
-
+from datetime import date
 from sqlalchemy.orm import Session
-from app.domain.profile.entity import UserProfile
 from app.core.config.database import SessionLocal
+from app.domain.report.entity import WeeklyExpense, MonthlySummary
+from app.core.utils.tsid import TSID
 
 logger = logging.getLogger(__name__)
 
 
-async def handle_onboarding_event(body: str):
-    logger.info(f"[ProfileConsumer] 수신된 body: {body[:200]}")
+async def handle_budget_event(body: str):
+    logger.info(f"[BudgetConsumer] 수신된 body: {body[:200]}")
     try:
-        body = body.strip().strip('\ufeff').replace('\xa0', ' ')
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        logger.exception(f"[ProfileConsumer] JSON 파싱 실패 - body={repr(body[:100])}")
+        data = json.loads(body.strip())
+    except json.JSONDecodeError:
+        logger.exception(f"[BudgetConsumer] JSON 파싱 실패 - body={repr(body[:100])}")
         raise
 
-    # 2. userId 검증
-    user_id = data.get("userId")
-    if not user_id or not isinstance(user_id, str) or not user_id.strip():
-        logger.error("[ProfileConsumer] userId 누락")
-        raise ValueError("userId 누락")
+    user_id    = data.get("userId")
+    year       = data.get("year")
+    month      = data.get("month")
+    week       = data.get("weekOfMonth")
+    start_date = data.get("startDate")
+    end_date   = data.get("endDate")
+    category   = data.get("category")
+    amount     = int(data.get("amount", 0))
+    event_type = data.get("eventType")
 
-    # 3. monthlyIncome 검증
-    monthly_income = data.get("monthlyIncome")
-    if monthly_income is not None:
-        try:
-            monthly_income = int(monthly_income)
-            if monthly_income < 0:
-                raise ValueError("음수 월급")
-        except (TypeError, ValueError) as e:
-            logger.error(f"[ProfileConsumer] monthlyIncome 형식 오류 - error={e}")
-            raise
+    if not all([user_id, year, month, week, category, event_type]):
+        logger.error(f"[BudgetConsumer] 필수 필드 누락 - data={data}")
+        raise ValueError("필수 필드 누락")
 
-    # 4. birth 파싱
-    birth = None
-    if data.get("birth"):
-        try:
-            birth = datetime.fromisoformat(data["birth"]).date()
-        except Exception as e:
-            logger.warning(f"[ProfileConsumer] birth 파싱 실패 - error={e}")
-
-    # 5. DB 저장 (upsert)
     db: Session = SessionLocal()
     try:
-        existing = db.query(UserProfile).filter(
-            UserProfile.user_id == user_id
-        ).first()
+        if event_type == "CREATED":
+            _upsert_weekly(db, user_id, year, month, week, start_date, end_date, amount)
+            _upsert_category(db, user_id, year, month, category, amount)
 
-        if existing:
-            existing.birth          = birth
-            existing.sex            = data.get("sex")
-            existing.monthly_income = monthly_income
-            logger.info(f"[ProfileConsumer] 유저 프로필 업데이트 완료")
+        elif event_type == "DELETED":
+            _upsert_weekly(db, user_id, year, month, week, start_date, end_date, -amount)
+            _upsert_category(db, user_id, year, month, category, -amount)
+
+        elif event_type == "UPDATED":
+            prev_amount = int(data.get("previousAmount", 0))
+            diff = amount - prev_amount
+            _upsert_weekly(db, user_id, year, month, week, start_date, end_date, diff)
+            _upsert_category(db, user_id, year, month, category, diff)
+
         else:
-            db.add(UserProfile(
-                user_id        = user_id,
-                birth          = birth,
-                sex            = data.get("sex"),
-                monthly_income = monthly_income,
-            ))
-            logger.info(f"[ProfileConsumer] 유저 프로필 신규 저장 완료")
+            logger.warning(f"[BudgetConsumer] 알 수 없는 eventType - {event_type}")
+            return
 
         db.commit()
+        logger.info(f"[BudgetConsumer] 처리 완료 - user_id={user_id}, eventType={event_type}")
 
     except Exception as e:
         db.rollback()
-        logger.error(f"[ProfileConsumer] DB 저장 실패 - error={e}")
+        logger.error(f"[BudgetConsumer] DB 저장 실패 - error={e}")
         raise
     finally:
         db.close()
 
-    # 6. 추천 파이프라인 실행 (신규 유저)
-    try:
-        from app.domain.recommend_ai.graph import run_recommend_pipeline
-        await run_recommend_pipeline(user_id)
-        logger.info(f"[ProfileConsumer] 추천 파이프라인 완료 - user_id={user_id}")
-    except Exception as e:
-        # 추천 실패해도 온보딩 자체는 성공 처리
-        logger.error(f"[ProfileConsumer] 추천 파이프라인 실패 - user_id={user_id}, error={e}")
+
+def _upsert_weekly(db, user_id, year, month, week, start_date, end_date, amount_delta):
+    row = db.query(WeeklyExpense).filter(
+        WeeklyExpense.user_id == user_id,
+        WeeklyExpense.year    == year,
+        WeeklyExpense.month   == month,
+        WeeklyExpense.week    == week,
+    ).first()
+
+    if row:
+        row.amount = max((row.amount or 0) + amount_delta, 0)
+    else:
+        db.add(WeeklyExpense(
+            weekly_id  = TSID.create(),
+            user_id    = user_id,
+            year       = year,
+            month      = month,
+            week       = week,
+            start_date = date.fromisoformat(start_date) if start_date else None,
+            end_date   = date.fromisoformat(end_date) if end_date else None,
+            amount     = max(amount_delta, 0),
+        ))
+
+
+def _upsert_category(db, user_id, year, month, category, amount_delta):
+    row = db.query(MonthlySummary).filter(
+        MonthlySummary.user_id  == user_id,
+        MonthlySummary.year     == year,
+        MonthlySummary.month    == month,
+        MonthlySummary.category == category,
+    ).first()
+
+    if row:
+        row.amount = max((row.amount or 0) + amount_delta, 0)
+    else:
+        db.add(MonthlySummary(
+            summary_id = TSID.create(),
+            user_id    = user_id,
+            year       = year,
+            month      = month,
+            category   = category,
+            amount     = max(amount_delta, 0),
+        ))

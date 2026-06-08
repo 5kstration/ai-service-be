@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     SQS_QUEUE_URL: str = ""         # 수신 큐 (AUTH → AI)
     SQS_PUBLISH_QUEUE_URL: str = "" # 발행 큐 (AI → AUTH), 프로필 업데이트 이벤트
     SQS_ENDPOINT_URL: str = ""      # 로컬: http://localhost:4566, 운영: 빈값
-    
+    SQS_BUDGET_QUEUE_URL: str = "https://sqs.ap-northeast-2.amazonaws.com/525089404962/budget-ai-event"
+
     #raw
     RAW_EXTERNAL_BASE_URL: str = "http://10.0.2.62:8081"
     # Bedrock (추천 파이프라인용)

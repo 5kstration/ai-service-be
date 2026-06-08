@@ -57,88 +57,73 @@ def get_sqs_client():
 
 
 async def start_consumers():
-    """
-    앱 시작 시 SQS consumer 폴링 시작.
-    main.py startup 이벤트에서 호출.
-    백그라운드 태스크로 실행.
-    """
     sqs = get_sqs_client()
     global _consumer_task
     if not sqs:
         logger.warning("[SQS] 클라이언트 없음 - consumer 등록 스킵")
         return
-    if not settings.SQS_QUEUE_URL:
-        logger.warning("[SQS] SQS_QUEUE_URL 미설정 - consumer 등록 스킵")
-        return
 
-    logger.info(f"[SQS] consumer 시작 - queue={settings.SQS_QUEUE_URL}")
-    if _consumer_task and not _consumer_task.done():
-        logger.info("[SQS] consumer 이미 실행 중 - 중복 시작 스킵")
-        return
-    _consumer_task = asyncio.create_task(_poll_messages(sqs))
+    tasks = []
 
-async def _poll_messages(sqs):
-    """
-    SQS 롱 폴링 루프.
-    메시지 수신 시 handle_onboarding_event 호출.
-    """
+    if settings.SQS_QUEUE_URL:
+        logger.info(f"[SQS] onboarding consumer 시작 - queue={settings.SQS_QUEUE_URL}")
+        tasks.append(asyncio.create_task(_poll_messages(sqs, settings.SQS_QUEUE_URL, "onboarding")))
+
+    if settings.SQS_BUDGET_QUEUE_URL:
+        logger.info(f"[SQS] budget consumer 시작 - queue={settings.SQS_BUDGET_QUEUE_URL}")
+        tasks.append(asyncio.create_task(_poll_messages(sqs, settings.SQS_BUDGET_QUEUE_URL, "budget")))
+
+    if tasks:
+        _consumer_task = tasks
+        
+async def _poll_messages(sqs, queue_url: str, consumer_type: str):
     from app.domain.profile.consumer import handle_onboarding_event
+    from app.domain.budget.consumer import handle_budget_event
+
+    handler = handle_budget_event if consumer_type == "budget" else handle_onboarding_event
 
     while True:
         try:
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: sqs.receive_message(
-                    QueueUrl            = settings.SQS_QUEUE_URL,
-                    MaxNumberOfMessages = 10,      # 최대 10개씩 수신
-                    WaitTimeSeconds     = 20,      # 롱 폴링 20초
-                    VisibilityTimeout   = 60,      # 처리 중 다른 consumer에게 숨김
+                    QueueUrl            = queue_url,
+                    MaxNumberOfMessages = 10,
+                    WaitTimeSeconds     = 20,
+                    VisibilityTimeout   = 60,
                 )
             )
-
             messages = response.get("Messages", [])
             if not messages:
                 continue
 
             for message in messages:
-                await _process_message(sqs, message, handle_onboarding_event)
+                await _process_message(sqs, message, handler, queue_url)
 
         except ClientError as e:
-            logger.error(f"[SQS] 메시지 수신 실패 - error={e}")
-            await asyncio.sleep(5)  # 에러 시 5초 대기 후 재시도
-        except Exception as e:
-            logger.error(f"[SQS] 알 수 없는 오류 - error={e}")
+            logger.error(f"[SQS] 메시지 수신 실패 - queue={queue_url}, error={e}")
             await asyncio.sleep(5)
+        except Exception as e:
+            logger.error(f"[SQS] 알 수 없는 오류 - queue={queue_url}, error={e}")
+            await asyncio.sleep(5)
+            
 
-
-async def _process_message(sqs, message: dict, handler):
-    """
-    단건 메시지 처리.
-    처리 성공 시 삭제, 실패 시 visibility timeout 후 재시도.
-
-    SQS 재시도 정책:
-    - 처리 실패 시 삭제하지 않음 → visibility timeout 후 자동 재시도
-    - 최대 재시도 횟수 초과 시 DLQ(Dead Letter Queue)로 이동
-    """
+async def _process_message(sqs, message: dict, handler, queue_url: str):
     receipt_handle = message["ReceiptHandle"]
-    body           = message.get("Body", "")
-
+    body = message.get("Body", "")
     try:
         await handler(body)
-
-        # 처리 성공 시 메시지 삭제
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: sqs.delete_message(
-                QueueUrl      = settings.SQS_QUEUE_URL,
+                QueueUrl      = queue_url,
                 ReceiptHandle = receipt_handle,
             )
         )
         logger.info("[SQS] 메시지 처리 및 삭제 완료")
-
     except Exception as e:
-        # 처리 실패 시 삭제 안 함 → visibility timeout 후 재시도
         logger.error(f"[SQS] 메시지 처리 실패 - 재시도 예정. error={e}")
+        
 
 
 # =============================================
