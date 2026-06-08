@@ -19,7 +19,7 @@ async def handle_onboarding_event(body: str):
         body = body.strip().strip('\ufeff')
         data = json.loads(body)
     except json.JSONDecodeError as e:
-        logger.error(f"[ProfileConsumer] JSON 파싱 실패 - error={e}, body={repr(body[:100])}")
+        logger.exception(f"[ProfileConsumer] JSON 파싱 실패 - body={repr(body[:100])}")
         raise
 
     # 2. userId 검증

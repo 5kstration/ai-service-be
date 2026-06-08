@@ -20,7 +20,10 @@ from app.domain.recommend.entity import CardProduct, InsuranceProduct, PolicyPro
 logger = logging.getLogger(__name__)
 
 SIMILAR_TOP_K_DEFAULT = 3
-
+_CAT_LIFE    = "생활지원"
+_CAT_CULTURE = "문화/여가"
+_CAT_FINANCE = "금융"
+_CAT_HEALTH  = "건강"
 
 def _parse_tags(tags_raw: Optional[str]) -> list[str]:
     if not tags_raw:
@@ -147,24 +150,19 @@ def _sync_policy(policy: PolicyProduct) -> None:
 
 # 카드/보험 혜택 키워드 → Category 매핑
 BENEFIT_CATEGORY_MAP = {
-    # 카드 혜택 키워드
-    "외식": "생활지원", "식비": "생활지원", "배달": "생활지원",
-    "카페": "문화/여가", "커피": "문화/여가",
-    "교통": "생활지원", "대중교통": "생활지원", "주유": "생활지원",
-    "쇼핑": "생활지원", "백화점": "생활지원",
-    "여행": "문화/여가", "해외": "문화/여가", "항공": "문화/여가",
-    "적립": "금융", "포인트": "금융", "캐시백": "금융",
-    "저축": "금융", "연금": "금융", "자산": "금융",
-    "영화": "문화/여가", "공연": "문화/여가", "OTT": "문화/여가",
-    "통신": "생활지원", "편의점": "생활지원",
-    # 보험 혜택 키워드
-    "실손": "건강", "의료": "건강", "입원": "건강", "수술": "건강",
-    "암": "건강", "건강": "건강", "치과": "건강", "치아": "건강",
-    "자동차": "생활지원", "운전자": "생활지원",
-    "종신": "금융", "사망": "금융",
-    "펫": "생활지원", "반려": "생활지원",
+    "외식": _CAT_LIFE, "식비": _CAT_LIFE, "배달": _CAT_LIFE,
+    "카페": _CAT_CULTURE, "커피": _CAT_CULTURE,
+    "교통": _CAT_LIFE, "대중교통": _CAT_LIFE, "주유": _CAT_LIFE,
+    "쇼핑": _CAT_LIFE, "백화점": _CAT_LIFE,
+    "여행": _CAT_CULTURE, "해외": _CAT_CULTURE, "항공": _CAT_CULTURE,
+    "적립": _CAT_FINANCE, "포인트": _CAT_FINANCE, "캐시백": _CAT_FINANCE,
+    "저축": _CAT_FINANCE, "연금": _CAT_FINANCE, "자산": _CAT_FINANCE,
+    "영화": _CAT_CULTURE, "공연": _CAT_CULTURE, "OTT": _CAT_CULTURE,
+    "통신": _CAT_LIFE, "편의점": _CAT_LIFE,
+    "실손": _CAT_HEALTH, "의료": _CAT_HEALTH, "입원": _CAT_HEALTH, "수술": _CAT_HEALTH,
+    "암": _CAT_HEALTH, "건강": _CAT_HEALTH, "치과": _CAT_HEALTH, "치아": _CAT_HEALTH,
+    "자동차": _CAT_LIFE, "운전자": _CAT_LIFE,
 }
-
 BENEFIT_TAG_MAP = {
     "외식": "외식할인", "카페": "카페할인", "교통": "교통할인",
     "주유": "주유할인", "쇼핑": "쇼핑할인", "여행": "여행혜택",

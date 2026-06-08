@@ -182,77 +182,88 @@ def _map_policy(source_code: str, raw: dict) -> dict:
 class SyncService:
     def __init__(self, db: Session):
         self.db = db
+    def _sync_single_card(self, external_id: str, source_code: str, raw: dict) -> str:
+        """카드 단건 저장. 'saved'/'skipped' 반환."""
+        existing = self.db.query(CardProduct).filter(
+            CardProduct.external_id == external_id
+        ).first()
+        if existing:
+            return "skipped"
+        mapped = _map_card(source_code, raw)
+        with self.db.begin_nested():
+            self.db.add(CardProduct(key=TSID.create(), external_id=external_id, **mapped))
+        return "saved"
+
+    def _sync_single_insurance(self, external_id: str, source_code: str, raw: dict) -> str:
+        existing = self.db.query(InsuranceProduct).filter(
+            InsuranceProduct.external_id == external_id
+        ).first()
+        if existing:
+            return "skipped"
+        mapped = _map_insurance(source_code, raw)
+        with self.db.begin_nested():
+            self.db.add(InsuranceProduct(key=TSID.create(), external_id=external_id, **mapped))
+        return "saved"
+
+    def _sync_single_policy(self, external_id: str, source_code: str, raw: dict) -> str:
+        existing = self.db.query(PolicyProduct).filter(
+            PolicyProduct.external_id == external_id
+        ).first()
+        if existing:
+            return "skipped"
+        mapped = _map_policy(source_code, raw)
+        with self.db.begin_nested():
+            self.db.add(PolicyProduct(
+                key=TSID.create(),
+                external_id=external_id,
+                conflict_policy_ids="[]",
+                **mapped,
+            ))
+        return "saved"
+
+    _SYNC_HANDLERS = {
+        "CARD":      _sync_single_card,
+        "INSURANCE": _sync_single_insurance,
+        "POLICY":    _sync_single_policy,
+    }
+
+    def _sync_item(self, item: dict, category: str) -> str:
+        """단건 처리. 'saved'/'skipped'/'failed' 반환."""
+        external_id = item.get("externalId")
+        source_code = item.get("sourceCode", "")
+        raw         = item.get("rawPayload", {})
+
+        if not external_id:
+            logger.warning(f"[SyncService] externalId 누락 스킵 - sourceCode={source_code}")
+            return "failed"
+
+        handler = _SYNC_HANDLERS.get(category)
+        if not handler:
+            return "failed"
+        return handler(self, external_id, source_code, raw)
 
     def sync_products(self, items: list[dict], category: str) -> dict:
-        """
-        items: rawExternalDocument 리스트 (api-connector에서 직접 전달)
-        category: CARD | INSURANCE | POLICY
-        """
-        saved, skipped, failed = 0, 0, 0
+        saved = skipped = failed = 0
 
         for item in items:
             try:
-                raw         = item.get("rawPayload", {})
-                external_id = item.get("externalId")
-                source_code = item.get("sourceCode", "")
-
-                if not external_id:
-                    logger.warning(f"[SyncService] externalId 누락 스킵 - sourceCode={source_code}")
+                result = self._sync_item(item, category)
+                if result == "saved":
+                    saved += 1
+                elif result == "skipped":
+                    skipped += 1
+                else:
                     failed += 1
-                    continue
-
-                if category == "CARD":
-                    existing = self.db.query(CardProduct).filter(CardProduct.external_id == external_id).first()
-                    if existing:
-                        skipped += 1
-                        continue
-                    mapped = _map_card(source_code, raw)
-                    with self.db.begin_nested():
-                        self.db.add(CardProduct(key=TSID.create(), external_id=external_id, **mapped))
-
-                elif category == "INSURANCE":
-                    existing = self.db.query(InsuranceProduct).filter(InsuranceProduct.external_id == external_id).first()
-                    if existing:
-                        skipped += 1
-                        continue
-                    mapped = _map_insurance(source_code, raw)
-                    with self.db.begin_nested():
-                        self.db.add(InsuranceProduct(key=TSID.create(), external_id=external_id, **mapped))
-
-                elif category == "POLICY":
-                    existing = self.db.query(PolicyProduct).filter(PolicyProduct.external_id == external_id).first()
-                    if existing:
-                        skipped += 1
-                        continue
-                    mapped = _map_policy(source_code, raw)
-                    with self.db.begin_nested():
-                        self.db.add(PolicyProduct(
-                            key=TSID.create(),
-                            external_id=external_id,
-                            conflict_policy_ids="[]",
-                            **mapped,
-                        ))
-
-                saved += 1
-
             except IntegrityError:
                 skipped += 1
                 logger.warning(f"[SyncService] 중복 스킵 - external_id={item.get('externalId')}")
-            except (TypeError, ValueError, AttributeError) as e:
-                logger.error(f"[SyncService] payload 매핑 실패 - external_id={item.get('externalId')}, error={e}")
+            except (TypeError, ValueError, AttributeError):
+                logger.exception(f"[SyncService] payload 매핑 실패 - external_id={item.get('externalId')}")
                 failed += 1
-            except SQLAlchemyError as e:
-                logger.error(f"[SyncService] DB 저장 실패 - external_id={item.get('externalId')}, error={e}")
+            except SQLAlchemyError:
+                logger.exception(f"[SyncService] DB 저장 실패 - external_id={item.get('externalId')}")
                 failed += 1
 
         self._commit(category)
         logger.info(f"[SyncService] {category} 동기화 완료 - saved={saved}, skipped={skipped}, failed={failed}")
         return {"saved": saved, "skipped": skipped, "failed": failed}
-
-    def _commit(self, label: str) -> None:
-        try:
-            self.db.commit()
-        except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"[SyncService] {label} 커밋 실패 - error={e}")
-            raise
