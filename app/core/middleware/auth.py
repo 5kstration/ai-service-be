@@ -1,6 +1,7 @@
 from fastapi import Header, HTTPException
 from app.core.config.settings import settings
-
+import logging
+logger = logging.getLogger(__name__)
 # auth.py에 임시로 로그 추가
 async def get_current_user(
     x_user_id: str = Header(None),
