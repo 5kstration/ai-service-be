@@ -5,7 +5,8 @@ import logging
 import boto3
 from botocore.exceptions import ClientError
 from app.core.config.settings import settings
-from app.domain.profile.consumer import handle_onboarding_event, handle_budget_event
+from app.domain.profile.consumer import handle_onboarding_event
+from app.domain.budget.consumer import handle_budget_event
 
 logger = logging.getLogger(__name__)
 
