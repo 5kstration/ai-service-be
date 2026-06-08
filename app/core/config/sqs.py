@@ -5,6 +5,7 @@ import logging
 import boto3
 from botocore.exceptions import ClientError
 from app.core.config.settings import settings
+from app.domain.profile.consumer import handle_onboarding_event, handle_budget_event
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +78,9 @@ async def start_consumers():
         _consumer_task = tasks
         
 async def _poll_messages(sqs, queue_url: str, consumer_type: str):
-    from app.domain.profile.consumer import handle_onboarding_event
-    from app.domain.budget.consumer import handle_budget_event
 
     handler = handle_budget_event if consumer_type == "budget" else handle_onboarding_event
-
+    
     while True:
         try:
             response = await asyncio.get_event_loop().run_in_executor(
