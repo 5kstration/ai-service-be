@@ -26,6 +26,13 @@ MAX_RECOMMEND = 5
 VECTOR_CANDIDATES = 30  # 벡터 검색 후보 수
 RERANK_TOP_N      = 7   # 리랭커 통과 후 LLM에 넘길 수
 
+_CAT_LIFE    = "생활지원"
+_CAT_CULTURE = "문화/여가"
+_CAT_FINANCE = "금융"
+_CAT_HEALTH  = "건강"
+_CAT_HOUSING = "주거"
+_CAT_EDU     = "교육/자기계발"
+_CAT_JOB     = "취업/창업"
 
 # =============================================
 # 1. 프로파일 노드
@@ -182,21 +189,21 @@ def vector_search_node(state: RecommendState) -> dict:
         sorted_summary = sorted(state.get("monthly_summary", []), key=lambda x: x.get("amount", 0), reverse=True)
 
         CATEGORY_MAP = {
-            "식비":   ["생활지원", "금융"],
-            "교통":   ["생활지원", "교통지원"],
-            "쇼핑":   ["생활지원", "금융"],
-            "카페":   ["생활지원", "문화/여가"],
-            "주거":   ["주거", "주거지원"],
-            "의료":   ["건강"],
-            "여행":   ["문화/여가"],
-            "자동차": ["생활지원", "금융"],
-            "문화":   ["문화/여가", "문화지원"],
-            "교육":   ["교육/자기계발", "교육지원"],
-            "사업":   ["취업/창업", "창업지원"],
-            "투자":   ["금융", "자산형성"],
-            "주유":   ["생활지원"],
-            "통신":   ["생활지원"],
-            "운동":   ["문화/여가", "건강"],
+            "식비":   [_CAT_LIFE, _CAT_FINANCE],
+            "교통":   [_CAT_LIFE, "교통지원"],
+            "쇼핑":   [_CAT_LIFE, _CAT_FINANCE],
+            "카페":   [_CAT_LIFE, _CAT_CULTURE],
+            "주거":   [_CAT_HOUSING, "주거지원"],
+            "의료":   [_CAT_HEALTH],
+            "여행":   [_CAT_CULTURE],
+            "자동차": [_CAT_LIFE, _CAT_FINANCE],
+            "문화":   [_CAT_CULTURE, "문화지원"],
+            "교육":   [_CAT_EDU, "교육지원"],
+            "사업":   [_CAT_JOB, "창업지원"],
+            "투자":   [_CAT_FINANCE, "자산형성"],
+            "주유":   [_CAT_LIFE],
+            "통신":   [_CAT_LIFE],
+            "운동":   [_CAT_CULTURE, _CAT_HEALTH],
         }
 
         raw_cats   = [s["category"] for s in sorted_summary[:2]]
