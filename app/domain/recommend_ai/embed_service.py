@@ -43,7 +43,17 @@ SYNONYM_MAP = {
     "통신":   "통신 휴대폰 인터넷 통신비 요금",
     "운동":   "운동 스포츠 헬스 체육 피트니스",
 }
-
+_INSURANCE_TYPE_MAP = [
+    (["실손", "의료비", "입원", "통원"], "의료비 실손 보장 병원비"),
+    (["암", "종양", "항암"],             "암 진단 집중 보장 건강"),
+    (["운전자", "자동차", "교통사고", "벌금"], "자동차 운전자 차량 출퇴근 운전"),
+    (["여행", "해외", "항공"],           "여행 해외여행 사고 보장"),
+    (["연금", "저축", "노후"],           "노후 연금 장기 자산 형성"),
+    (["펫", "반려", "동물"],             "반려동물 펫 의료비"),
+    (["치아", "임플란트", "치과"],       "치과 치아 임플란트 치료비"),
+    (["종신", "사망", "생명"],           "사망 종신 가족 부양"),
+    (["어린이", "태아", "자녀"],         "자녀 어린이 태아 성장기"),
+]
 def expand_synonyms(text: str) -> str:
     for keyword, synonyms in SYNONYM_MAP.items():
         if keyword in text:
@@ -117,31 +127,19 @@ def _card_to_text(card: CardProduct) -> str:
         f"{card.company} {card.card_name}"
     )
     return process_text(raw)
+def _get_insurance_type_hint(name: str, benefit: str) -> str:
+    """보험 이름/혜택 키워드로 타입 힌트 반환."""
+    for keywords, hint in _INSURANCE_TYPE_MAP:
+        if any(k in name or k in benefit for k in keywords):
+            return hint
+    return ""
+
 
 def _insurance_to_text(ins: InsuranceProduct) -> str:
     benefit       = ins.top_benefit or ""
     name          = ins.insurance_name or ""
     benefits_text = _parse_benefits_text(ins.benefits or "")
-    type_hint     = ""
-
-    if any(k in name or k in benefit for k in ["실손", "의료비", "입원", "통원"]):
-        type_hint = "의료비 실손 보장 병원비"
-    elif any(k in name or k in benefit for k in ["암", "종양", "항암"]):
-        type_hint = "암 진단 집중 보장 건강"
-    elif any(k in name or k in benefit for k in ["운전자", "자동차", "교통사고", "벌금"]):
-        type_hint = "자동차 운전자 차량 출퇴근 운전"
-    elif any(k in name or k in benefit for k in ["여행", "해외", "항공"]):
-        type_hint = "여행 해외여행 사고 보장"
-    elif any(k in name or k in benefit for k in ["연금", "저축", "노후"]):
-        type_hint = "노후 연금 장기 자산 형성"
-    elif any(k in name or k in benefit for k in ["펫", "반려", "동물"]):
-        type_hint = "반려동물 펫 의료비"
-    elif any(k in name or k in benefit for k in ["치아", "임플란트", "치과"]):
-        type_hint = "치과 치아 임플란트 치료비"
-    elif any(k in name or k in benefit for k in ["종신", "사망", "생명"]):
-        type_hint = "사망 종신 가족 부양"
-    elif any(k in name or k in benefit for k in ["어린이", "태아", "자녀"]):
-        type_hint = "자녀 어린이 태아 성장기"
+    type_hint     = _get_insurance_type_hint(name, benefit)
 
     raw = (
         f"{type_hint} "
