@@ -4,7 +4,7 @@ import logging
 from datetime import date
 from sqlalchemy.orm import Session
 from app.core.config.database import SessionLocal
-from app.domain.report.entity import WeeklyExpense, MonthlySummary
+from app.domain.report.entity import WeeklyExpense, MonthlySummary, Goal
 from app.core.utils.tsid import TSID
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,9 @@ async def handle_budget_event(body: str):
         else:
             logger.warning(f"[BudgetConsumer] 알 수 없는 eventType - {event_type}")
             return
+
+        # goal total_expense 업데이트
+        _update_goal_total(db, user_id, year, month)
 
         db.commit()
         logger.info(f"[BudgetConsumer] 처리 완료 - user_id={user_id}, eventType={event_type}")
@@ -102,3 +105,33 @@ def _upsert_category(db, user_id, year, month, category, amount_delta):
             category   = category,
             amount     = max(amount_delta, 0),
         ))
+
+    # ratio 재계산
+    db.flush()
+    all_rows = db.query(MonthlySummary).filter(
+        MonthlySummary.user_id == user_id,
+        MonthlySummary.year    == year,
+        MonthlySummary.month   == month,
+    ).all()
+
+    total = sum(r.amount or 0 for r in all_rows)
+    if total > 0:
+        for r in all_rows:
+            r.ratio = round((r.amount or 0) / total * 100, 2)
+
+
+def _update_goal_total(db, user_id, year, month):
+    goal_month = date(year, month, 1)
+    goal = db.query(Goal).filter(
+        Goal.user_id    == user_id,
+        Goal.goal_month == goal_month,
+    ).first()
+
+    if goal:
+        all_weekly = db.query(WeeklyExpense).filter(
+            WeeklyExpense.user_id == user_id,
+            WeeklyExpense.year    == year,
+            WeeklyExpense.month   == month,
+        ).all()
+        goal.total_expense = sum(w.amount or 0 for w in all_weekly)
+        logger.info(f"[BudgetConsumer] goal total_expense 업데이트 - total={goal.total_expense}")
