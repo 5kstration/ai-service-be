@@ -72,4 +72,7 @@ async def handle_onboarding_event(body: str):
 
     try:
         from app.domain.recommend_ai.graph import run_recommend_pipeline
-        await run_recommend_
+        await run_recommend_pipeline(user_id)
+        logger.info(f"[ProfileConsumer] 추천 파이프라인 완료 - user_id={user_id}")
+    except Exception as e:
+        logger.error(f"[ProfileConsumer] 추천 파이프라인 실패 - user_id={user_id}, error={e}")
