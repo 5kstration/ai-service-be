@@ -38,3 +38,10 @@ class RecommendState(TypedDict):
 
     # 에러 추적
     error: Optional[str]
+
+    # =============================================
+    # Ablation Study 플래그 (헤더로 주입, 기본값 False)
+    # =============================================
+    disable_neo4j:          Optional[bool]   # True: graph_expand_node skip
+    disable_rerank:         Optional[bool]   # True: rerank_node skip
+    disable_income_filter:  Optional[bool]   # True: 소득조건 필터 skip

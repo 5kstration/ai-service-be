@@ -3,6 +3,7 @@ import json
 import logging
 import sys
 from datetime import date
+import re as _re
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -252,19 +253,20 @@ def vector_search_node(state: RecommendState) -> dict:
 # 3-1. 리랭크 노드
 # =============================================
 def rerank_node(state: RecommendState) -> dict:
-    """
-    벡터 검색 후보를 Cohere Rerank로 재정렬.
-    20개 → 7개로 압축해서 LLM 입력 토큰 절감.
- 
-    실패 시: 원본 순서 그대로 top_n개 통과 (서비스 중단 없음)
-    """
     if state.get("error"):
         return {}
  
-    from app.domain.recommend_ai.reranker import reranker_client
-    from app.domain.recommend_ai.embed_service import _card_to_text, _insurance_to_text, _policy_to_text
+    # Ablation: rerank skip
+    if state.get("disable_rerank"):
+        logger.info("[RerankNode] SKIP (disable_rerank=true) - 상위 7개만 통과")
+        return {
+            "card_candidates":      state["card_candidates"][:RERANK_TOP_N],
+            "insurance_candidates": state["insurance_candidates"][:RERANK_TOP_N],
+            "policy_candidates":    state["policy_candidates"][:RERANK_TOP_N],
+        }
  
-    # 유저 쿼리 텍스트 (임베딩 때 만든 것과 동일)
+    from app.domain.recommend_ai.reranker import reranker_client
+ 
     summary_text = ", ".join([
         f"{s['category']} {s['amount']:,}원"
         for s in state["monthly_summary"]
@@ -276,14 +278,12 @@ def rerank_node(state: RecommendState) -> dict:
     )
  
     def rerank_candidates(candidates: list, text_fn) -> list:
-        """후보 리스트를 리랭킹해서 상위 RERANK_TOP_N개만 반환."""
         if not candidates:
             return []
         texts   = [text_fn(c) for c in candidates]
         indices = reranker_client.rerank(query, texts, top_n=RERANK_TOP_N)
         return [candidates[i] for i in indices]
  
-    # 카드 텍스트 변환 함수 (dict → str)
     def card_text(c: dict) -> str:
         return f"{c.get('company','')} {c.get('card_name','')}. {c.get('top_benefit','')}. 혜택: {c.get('benefits','')}"
  
@@ -309,99 +309,88 @@ def rerank_node(state: RecommendState) -> dict:
         "insurance_candidates": reranked_insurances,
         "policy_candidates":    reranked_policies,
     }
-
 # =============================================
 # 4. 필터 노드 (룰 기반)
 # =============================================
-import re as _re
-
-# 2025년 1인가구 기준 중위소득 (월)
 _MEDIAN_INCOME_1P = 2_392_013
-
+ 
 def _income_condition_met(condition: str, monthly_income: int) -> bool:
-    """소득 조건 텍스트 파싱 → 충족 여부 반환."""
     if not condition:
         return True
     c = condition.strip()
-
     if any(x in c for x in ["제한없음", "기준 없음", "없음"]):
         return True
-
-    # 중위소득 % 기반
     m = _re.search(r"중위소득\s*(\d+)%\s*이하", c)
     if m:
-        pct   = int(m.group(1))
-        limit = _MEDIAN_INCOME_1P * pct / 100
-        return monthly_income <= limit
-
-    # 연소득/총급여 기반 → 월 환산
+        return monthly_income <= _MEDIAN_INCOME_1P * int(m.group(1)) / 100
     m = _re.search(r"(?:연소득|총급여|개인소득)\s*([\d,]+)만?원\s*이하", c)
     if m:
         val = int(m.group(1).replace(",", ""))
-        if val < 10000:
-            val *= 10000
+        if val < 10000: val *= 10000
         return monthly_income <= val / 12
-
-    # 부부합산 → 절반으로
     m = _re.search(r"부부합산\s*([\d,]+)만?원\s*이하", c)
     if m:
         val = int(m.group(1).replace(",", ""))
-        if val < 10000:
-            val *= 10000
+        if val < 10000: val *= 10000
         return monthly_income <= val / 2 / 12
-
-    # 소득분위, 예술활동 등 파싱 어려운 건 통과
     return True
-
-
+ 
 def filter_node(state: RecommendState) -> dict:
-    """나이/소득 조건으로 정책 필터링."""
     if state.get("error"):
         return {}
-
+ 
     user_age    = state.get("user_age") or 0
     user_income = state.get("user_income") or 0
-
+    skip_income = state.get("disable_income_filter", False)
+ 
     filtered = []
     rejected = 0
     for policy in state["policy_candidates"]:
         age_min = policy.get("age_min")
         age_max = policy.get("age_max")
-
-        # 나이 조건
+ 
+        # 나이 조건 (항상 체크)
         if age_min is not None and user_age < age_min:
             rejected += 1
             continue
         if age_max is not None and user_age > age_max:
             rejected += 1
             continue
-
-        # 소득 조건
-        income_condition = policy.get("income_condition") or ""
-        if not _income_condition_met(income_condition, user_income):
-            rejected += 1
-            continue
-
+ 
+        # 소득 조건 (disable_income_filter=true면 skip)
+        if not skip_income:
+            income_condition = policy.get("income_condition") or ""
+            if not _income_condition_met(income_condition, user_income):
+                rejected += 1
+                continue
+ 
         filtered.append(policy)
-
+ 
     logger.info(
         f"[FilterNode] 필터 완료 - "
         f"{len(state['policy_candidates'])}개 → {len(filtered)}개 "
-        f"(나이/소득 조건 미충족 {rejected}개 제외)"
+        f"(제외 {rejected}개, 소득필터={'OFF' if skip_income else 'ON'})"
     )
     return {"filtered_policies": filtered}
+ 
+ 
+
 # =============================================
 # 4-1. Graph 확장 노드 (Neo4j)
 # =============================================
 def graph_expand_node(state: RecommendState) -> dict:
-    """
-    필터링된 정책 후보를 Neo4j 그래프로 확장해서 LLM 근거 컨텍스트를 강화.
-    Neo4j 설정이 없으면 빈 결과를 반환하고 파이프라인은 계속 진행.
-    """
     if state.get("error"):
         return {}
-
-    # 카드/보험 후보(리랭크 이후)를 그래프로 확장
+ 
+    # Ablation: neo4j skip
+    if state.get("disable_neo4j"):
+        logger.info("[GraphExpandNode] SKIP (disable_neo4j=true)")
+        return {
+            "card_graph_triples":      [],
+            "insurance_graph_triples": [],
+            "policy_graph_triples":    [],
+        }
+ 
     card_keys = [
         c.get("key")
         for c in (state.get("card_candidates") or [])
@@ -412,26 +401,24 @@ def graph_expand_node(state: RecommendState) -> dict:
         for i in (state.get("insurance_candidates") or [])
         if isinstance(i, dict) and i.get("key")
     ]
-
-    # 정책은 필터링된 후보를 기준으로 확장
     policies = state.get("filtered_policies") or []
     policy_keys = [p.get("key") for p in policies if isinstance(p, dict) and p.get("key")]
-
-    card_triples = neo4j_client.fetch_triples(card_keys, label_hint="Card")
+ 
+    card_triples      = neo4j_client.fetch_triples(card_keys,      label_hint="Card")
     insurance_triples = neo4j_client.fetch_triples(insurance_keys, label_hint="Insurance")
-    policy_triples = neo4j_client.fetch_triples(policy_keys, label_hint="Policy")
-
+    policy_triples    = neo4j_client.fetch_triples(policy_keys,    label_hint="Policy")
+ 
     logger.info(
         "[GraphExpandNode] 완료 - "
         f"cards={len(card_keys)}/{len(card_triples)}triples, "
         f"insurances={len(insurance_keys)}/{len(insurance_triples)}triples, "
         f"policies={len(policy_keys)}/{len(policy_triples)}triples"
     )
-
+ 
     return {
-        "card_graph_triples": card_triples,
+        "card_graph_triples":      card_triples,
         "insurance_graph_triples": insurance_triples,
-        "policy_graph_triples": policy_triples,
+        "policy_graph_triples":    policy_triples,
     }
 
 

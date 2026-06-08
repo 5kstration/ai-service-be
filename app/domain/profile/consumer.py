@@ -13,11 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_onboarding_event(body: str):
-    # 1. JSON 파싱
+    logger.info(f"[ProfileConsumer] 수신된 body: {body[:200]}")
     try:
+        # body에 BOM이나 특수문자 제거
+        body = body.strip().strip('\ufeff')
         data = json.loads(body)
     except json.JSONDecodeError as e:
-        logger.error(f"[ProfileConsumer] JSON 파싱 실패 - error={e}")
+        logger.error(f"[ProfileConsumer] JSON 파싱 실패 - error={e}, body={repr(body[:100])}")
         raise
 
     # 2. userId 검증
