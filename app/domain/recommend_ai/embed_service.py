@@ -162,6 +162,44 @@ def _policy_to_text(policy: PolicyProduct) -> str:
     )
     return process_text(raw)
 
+# =============================================
+# 단일 상품 임베딩 저장 (공통)
+# =============================================
+def _embed_and_save(vdb, item, product_type: str, text_fn) -> bool:
+    """단일 상품 임베딩 생성 및 저장. 성공 True, 실패 False."""
+    try:
+        text      = text_fn(item)
+        embedding = bedrock_client.embed(text)
+        time.sleep(0.5)
+        vdb.add(ProductEmbedding(
+            id           = TSID.create(),
+            product_id   = item.key,
+            product_type = product_type,
+            embedding    = embedding,
+            content      = text,
+        ))
+        vdb.commit()
+        return True
+    except Exception:
+        vdb.rollback()
+        logger.exception(f"[EmbedService] {product_type} 임베딩 실패 - key={item.key}")
+        return False
+
+
+def _embed_products(db, vdb, model_cls, product_type: str, text_fn, log_interval: int = 10):
+    """특정 타입 전체 상품 임베딩."""
+    items = db.query(model_cls).all()
+    logger.info(f"[EmbedService] {product_type} 임베딩 시작 - {len(items)}개")
+    saved = failed = 0
+    for item in items:
+        if _embed_and_save(vdb, item, product_type, text_fn):
+            saved += 1
+            if saved % log_interval == 0:
+                logger.info(f"[EmbedService] 진행 중 - saved={saved}")
+        else:
+            failed += 1
+    return saved, failed
+
 
 # =============================================
 # 전체 상품 임베딩 생성 (개별 commit)
@@ -169,92 +207,27 @@ def _policy_to_text(policy: PolicyProduct) -> str:
 def embed_all_products():
     db:  Session = SessionLocal()
     vdb: Session = VectorSessionLocal()
-    saved = 0
-    failed = 0
-
     try:
-        # 기존 임베딩 삭제
         vdb.query(ProductEmbedding).delete()
         vdb.commit()
         logger.info("[EmbedService] 기존 임베딩 삭제 완료")
 
-        # 카드 임베딩
-        cards = db.query(CardProduct).all()
-        logger.info(f"[EmbedService] 카드 임베딩 시작 - {len(cards)}개")
-        for card in cards:
-            try:
-                text      = _card_to_text(card)
-                embedding = bedrock_client.embed(text)
-                time.sleep(0.5)
-                vdb.add(ProductEmbedding(
-                    id           = TSID.create(),
-                    product_id   = card.key,
-                    product_type = "card",
-                    embedding    = embedding,
-                    content      = text,
-                ))
-                vdb.commit()  # 개별 commit
-                saved += 1
-                if saved % 10 == 0:
-                    logger.info(f"[EmbedService] 진행 중 - saved={saved}")
-            except Exception as e:
-                vdb.rollback()
-                failed += 1
-                logger.error(f"[EmbedService] 카드 임베딩 실패 - key={card.key}, error={e}")
+        total_saved = total_failed = 0
 
-        # 보험 임베딩
-        insurances = db.query(InsuranceProduct).all()
-        logger.info(f"[EmbedService] 보험 임베딩 시작 - {len(insurances)}개")
-        for ins in insurances:
-            try:
-                text      = _insurance_to_text(ins)
-                embedding = bedrock_client.embed(text)
-                time.sleep(0.5)
-                vdb.add(ProductEmbedding(
-                    id           = TSID.create(),
-                    product_id   = ins.key,
-                    product_type = "insurance",
-                    embedding    = embedding,
-                    content      = text,
-                ))
-                vdb.commit()  # 개별 commit
-                saved += 1
-                if saved % 10 == 0:
-                    logger.info(f"[EmbedService] 진행 중 - saved={saved}")
-            except Exception as e:
-                vdb.rollback()
-                failed += 1
-                logger.error(f"[EmbedService] 보험 임베딩 실패 - key={ins.key}, error={e}")
+        for model_cls, product_type, text_fn, interval in [
+            (CardProduct,      "card",      _card_to_text,      10),
+            (InsuranceProduct, "insurance", _insurance_to_text, 10),
+            (PolicyProduct,    "policy",    _policy_to_text,    50),
+        ]:
+            saved, failed = _embed_products(db, vdb, model_cls, product_type, text_fn, interval)
+            total_saved  += saved
+            total_failed += failed
 
-        # 정책 임베딩
-        policies = db.query(PolicyProduct).all()
-        logger.info(f"[EmbedService] 정책 임베딩 시작 - {len(policies)}개")
-        for policy in policies:
-            try:
-                text      = _policy_to_text(policy)
-                embedding = bedrock_client.embed(text)
-                time.sleep(0.5)
-                vdb.add(ProductEmbedding(
-                    id           = TSID.create(),
-                    product_id   = policy.key,
-                    product_type = "policy",
-                    embedding    = embedding,
-                    content      = text,
-                ))
-                vdb.commit()  # 개별 commit
-                saved += 1
-                if saved % 50 == 0:
-                    logger.info(f"[EmbedService] 진행 중 - saved={saved}")
-            except Exception as e:
-                vdb.rollback()
-                failed += 1
-                logger.error(f"[EmbedService] 정책 임베딩 실패 - key={policy.key}, error={e}")
+        logger.info(f"[EmbedService] 임베딩 완료 - saved={total_saved}, failed={total_failed}")
 
-        logger.info(f"[EmbedService] 임베딩 완료 - saved={saved}, failed={failed}")
-
-    except Exception as e:
+    except Exception:
         vdb.rollback()
-        logger.error(f"[EmbedService] 임베딩 저장 실패 - error={e}")
+        logger.exception("[EmbedService] 임베딩 저장 실패")
         raise
     finally:
         db.close()
