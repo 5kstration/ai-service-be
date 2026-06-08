@@ -64,7 +64,7 @@ def normalize_numbers(text: str) -> str:
     return text
 
 def clean_text(text: str) -> str:
-    text = re.sub(r"\.", " ", text)
+    text = text.replace(".", " ")
     words = text.split()
     words = [w for w in words if w not in STOPWORDS]
     text  = " ".join(words)
