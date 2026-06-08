@@ -342,7 +342,7 @@ def _income_condition_met(condition: str, monthly_income: int) -> bool:
         return monthly_income <= val / 2 / 12
     return True
  
- def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_income: bool) -> bool:
+def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_income: bool) -> bool:
     """정책 자격 조건 체크. 통과하면 True."""
     age_min = policy.get("age_min")
     age_max = policy.get("age_max")
