@@ -23,32 +23,18 @@ def setup_scheduler():
 
 
 async def _daily_batch():
-    """매일 새벽 3시 실행 배치."""
     logger.info("[Scheduler] 배치 시작")
-
     try:
         from app.core.config.database import SessionLocal
-        from app.domain.sync.service import SyncService
         from app.domain.recommend_ai.embed_service import embed_all_products
         from app.domain.recommend_ai.graph import run_recommend_pipeline
         from app.domain.profile.entity import UserProfile
 
-        # 1. 상품 데이터 동기화
-        db = SessionLocal()
-        try:
-            sync = SyncService(db)
-            sync.sync_card_products()
-            sync.sync_insurance_products()
-            sync.sync_policy_products()
-            logger.info("[Scheduler] 상품 동기화 완료")
-        finally:
-            db.close()
-
-        # 2. 전체 상품 임베딩 갱신
+        # 1. 전체 상품 임베딩 갱신
         embed_all_products()
         logger.info("[Scheduler] 임베딩 갱신 완료")
 
-        # 3. 전체 유저 재추천
+        # 2. 전체 유저 재추천
         db = SessionLocal()
         try:
             users = db.query(UserProfile).all()
@@ -59,10 +45,10 @@ async def _daily_batch():
         for user in users:
             try:
                 await run_recommend_pipeline(user.user_id)
-            except Exception as e:
-                logger.error(f"[Scheduler] 유저 추천 실패 - user_id={user.user_id}, error={e}")
+            except Exception:
+                logger.exception(f"[Scheduler] 유저 추천 실패 - user_id={user.user_id}")
 
         logger.info("[Scheduler] 배치 완료")
 
-    except Exception as e:
-        logger.error(f"[Scheduler] 배치 실패 - error={e}")
+    except Exception:
+        logger.exception("[Scheduler] 배치 실패")
