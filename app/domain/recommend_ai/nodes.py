@@ -342,44 +342,39 @@ def _income_condition_met(condition: str, monthly_income: int) -> bool:
         return monthly_income <= val / 2 / 12
     return True
  
+ def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_income: bool) -> bool:
+    """정책 자격 조건 체크. 통과하면 True."""
+    age_min = policy.get("age_min")
+    age_max = policy.get("age_max")
+
+    if age_min is not None and user_age < age_min:
+        return False
+    if age_max is not None and user_age > age_max:
+        return False
+    if not skip_income:
+        income_condition = policy.get("income_condition") or ""
+        if not _income_condition_met(income_condition, user_income):
+            return False
+    return True
+
+
 def filter_node(state: RecommendState) -> dict:
     if state.get("error"):
         return {}
- 
+
     user_age    = state.get("user_age") or 0
     user_income = state.get("user_income") or 0
     skip_income = state.get("disable_income_filter", False)
- 
-    filtered = []
-    rejected = 0
-    for policy in state["policy_candidates"]:
-        age_min = policy.get("age_min")
-        age_max = policy.get("age_max")
- 
-        # 나이 조건 (항상 체크)
-        if age_min is not None and user_age < age_min:
-            rejected += 1
-            continue
-        if age_max is not None and user_age > age_max:
-            rejected += 1
-            continue
- 
-        # 소득 조건 (disable_income_filter=true면 skip)
-        if not skip_income:
-            income_condition = policy.get("income_condition") or ""
-            if not _income_condition_met(income_condition, user_income):
-                rejected += 1
-                continue
- 
-        filtered.append(policy)
- 
+
+    filtered  = [p for p in state["policy_candidates"] if _is_policy_eligible(p, user_age, user_income, skip_income)]
+    rejected  = len(state["policy_candidates"]) - len(filtered)
+
     logger.info(
         f"[FilterNode] 필터 완료 - "
         f"{len(state['policy_candidates'])}개 → {len(filtered)}개 "
         f"(제외 {rejected}개, 소득필터={'OFF' if skip_income else 'ON'})"
     )
     return {"filtered_policies": filtered}
- 
  
 
 # =============================================
