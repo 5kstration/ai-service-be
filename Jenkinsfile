@@ -54,22 +54,13 @@ stage('LLM Judge') {
             accessKeyVariable: 'AWS_ACCESS_KEY_ID',
             secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
         ]]) {
-            sh '''
-                python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
-
-                aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-
-                export DB_HOST=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_HOST}' | base64 -d)
-                export DB_NAME=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_NAME}' | base64 -d)
-                export DB_USER=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_USER}' | base64 -d)
-                export DB_PASSWORD=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)
-                export ANTHROPIC_API_KEY=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.ANTHROPIC_API_KEY}' | base64 -d)
-                export EVAL_BASE_URL=http://ai-service.moneylog.svc.cluster.local:8000
-                export EVAL_WAIT_SEC=30
-                export EVAL_CALL_INTERVAL=20
-
-                python3 llm_benchmark.py
-            '''
+        sh '''
+            aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+            
+            AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
+            kubectl cp llm_benchmark.py moneylog/$AI_POD:/tmp/llm_benchmark.py
+            kubectl exec -n moneylog $AI_POD -- python3 /tmp/llm_benchmark.py
+        '''
         }
     }
 }
