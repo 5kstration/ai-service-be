@@ -217,4 +217,21 @@ class RecommendRepository:
             self.db.rollback()
             logger.error(f"[RecommendRepository] 북마크 카드 목록 조회 실패 - error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
- 
+
+
+
+# =============================================
+# 유틸
+# =============================================
+    def find_last_recommended_at(self, user_id: str):
+        result = self.db.query(RecommendCard.created_at).filter(
+            RecommendCard.user_id == user_id
+        ).order_by(RecommendCard.created_at.desc()).first()
+        return result[0] if result else None
+
+    def count_summary_updates_since(self, user_id: str, since) -> int:
+        from app.domain.report.entity import MonthlySummary
+        return self.db.query(MonthlySummary).filter(
+            MonthlySummary.user_id    == user_id,
+            MonthlySummary.updated_at >  since,
+        ).count()
