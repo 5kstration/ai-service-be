@@ -224,7 +224,7 @@ def llm_judge(user: dict, results: dict) -> dict:
             lines.append(f"      추천사유: {item['reason'][:100]}")
         return "\n".join(lines)
 
- prompt = f"""당신은 청년 금융 추천 시스템의 공정한 평가자입니다.
+    prompt = f"""당신은 청년 금융 추천 시스템의 공정한 평가자입니다.
 아래 유저 정보와 추천 결과를 보고 평가해주세요.
 
 ## 중요 평가 원칙
