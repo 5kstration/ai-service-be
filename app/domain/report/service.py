@@ -78,10 +78,11 @@ class ReportService:
 
         # 프로필 없으면 goal 체크 의미 없음
         if profile_required:
-            logger.info(f"[ReportService] 프로필 미설정 - user_id={user_id}")
+            goal = self.repo.find_goal_current_month(user_id)
+            goal_required = (goal is None)
             return ReportEntryStatusResponse(
                 profile_required = True,
-                goal_required    = True,   # 어차피 다음 단계
+                goal_required    = goal_required,
                 is_ready         = False,
             )
 
