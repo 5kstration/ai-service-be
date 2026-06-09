@@ -45,30 +45,27 @@ pipeline {
             }
         }
     }
-stage('LLM Judge') {
-    steps {
-        echo '🤖 [LLM Judge] 추천 품질 평가 중...'
-        withCredentials([[
-            $class: 'AmazonWebServicesCredentialsBinding',
-            credentialsId: "${AWS_CRED_ID}",
-            accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-            secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        ]]) {
-            sh '''
-                python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
-                aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+    stage('LLM Judge') {
+        steps {
+            echo '🤖 [LLM Judge] 추천 품질 평가 중...'
+            withCredentials([[
+                $class: 'AmazonWebServicesCredentialsBinding',
+                credentialsId: "${AWS_CRED_ID}",
+                accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+            ]]) {
+                sh '''
+                    python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
+                    aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
 
-                AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
-                kubectl cp llm_benchmark.py moneylog/$AI_POD:/tmp/llm_benchmark.py
-                kubectl exec -n moneylog $AI_POD \
-                    --env EVAL_BASE_URL=http://localhost:8000 \
-                    --env EVAL_WAIT_SEC=60 \
-                    --env EVAL_CALL_INTERVAL=25 \
-                    -- python3 /tmp/llm_benchmark.py
-            '''
+                    AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
+                    kubectl cp llm_benchmark.py moneylog/$AI_POD:/tmp/llm_benchmark.py
+                    kubectl exec -n moneylog $AI_POD -- \
+                        sh -c 'EVAL_BASE_URL=http://localhost:8000 EVAL_WAIT_SEC=60 EVAL_CALL_INTERVAL=25 python3 /tmp/llm_benchmark.py'
+                '''
+            }
         }
     }
-}
         stage('AWS ECR Authentication') {
             steps {
                 echo 'Logging in to ECR...'
