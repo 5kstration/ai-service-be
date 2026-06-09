@@ -36,6 +36,7 @@ class MonthlySummary(Base):
     amount     = Column(Integer)
     ratio      = Column(Numeric(5, 2))
     created_at = Column(DateTime,       nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class WeeklyExpense(Base):
