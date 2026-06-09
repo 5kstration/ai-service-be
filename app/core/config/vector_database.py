@@ -16,7 +16,12 @@ VECTOR_DB_URL = URL.create(
     query      = {"sslmode": "require"},
 )
 
-vector_engine      = create_engine(VECTOR_DB_URL, echo=False)
+vector_engine = create_engine(
+    VECTOR_DB_URL,
+    echo=False,
+    pool_pre_ping=True,        # 커넥션 사용 전 유효성 체크
+    pool_recycle=1800,         # 30분마다 커넥션 재사용
+)
 VectorSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=vector_engine)
 
 

@@ -99,7 +99,11 @@ class InsightService:
                 return InsightCardItem(
                     insight_type = "weekly_trend",
                     title        = f"{latest.week}주차 지출이 줄었어요",
-                    description  = f"지난주보다 {diff_pct}% 감소했어요. 이 추세라면 이번 달 절약 가능해요!",
+                    description  = (
+                        f"지난주({prev.week}주차 {(prev.amount or 0):,}원)보다 {diff_pct}% 줄었어요. "
+                        f"절약한 금액은 {abs(diff):,}원이에요. "
+                        f"이 추세라면 이번 달 목표 달성도 충분히 가능해요!"
+                    ),
                     icon_type    = "TrendingDown",
                     accent_color = "#3182F6",
                     metric_value = f"{diff_pct}%",
@@ -108,7 +112,11 @@ class InsightService:
                 return InsightCardItem(
                     insight_type = "weekly_trend",
                     title        = f"{latest.week}주차 지출 주의",
-                    description  = f"지난주보다 {diff_pct}% 증가했어요. 이번 주 지출을 조금 줄여보세요.",
+                    description  = (
+                        f"지난주({prev.week}주차 {(prev.amount or 0):,}원)보다 {diff_pct}% 늘었어요. "
+                        f"늘어난 금액은 {abs(diff):,}원이에요. "
+                        f"이번 주는 조금만 더 아껴볼까요?"
+                    ),
                     icon_type    = "TrendingUp",
                     accent_color = "#F43F5E",
                     metric_value = f"{diff_pct}%",
