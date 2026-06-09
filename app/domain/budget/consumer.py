@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config.database import SessionLocal
 from app.domain.report.entity import WeeklyExpense, MonthlySummary, Goal
 from app.core.utils.tsid import TSID
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,8 @@ def _upsert_category(db, user_id, year, month, category, amount_delta):
 
     if row:
         row.amount = max((row.amount or 0) + amount_delta, 0)
+        row.updated_at = datetime.utcnow()  # 명시적 추가
+
     else:
         db.add(MonthlySummary(
             summary_id = TSID.create(),
