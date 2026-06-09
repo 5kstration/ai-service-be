@@ -23,7 +23,7 @@ load_dotenv()
 BASE_URL       = os.getenv("EVAL_BASE_URL", "http://localhost:8000")
 PASS_THRESHOLD = int(os.getenv("LLM_JUDGE_THRESHOLD", "70"))  # 통과 기준 점수
 CALL_INTERVAL  = int(os.getenv("EVAL_CALL_INTERVAL", "15"))
-WAIT_SEC       = int(os.getenv("EVAL_WAIT_SEC", "10"))
+WAIT_SEC       = int(os.getenv("EVAL_WAIT_SEC", "60"))
 
 # =============================================
 # 테스트 유저 (5명 - CI 속도 고려)
