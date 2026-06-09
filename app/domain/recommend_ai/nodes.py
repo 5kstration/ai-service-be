@@ -342,8 +342,14 @@ def _income_condition_met(condition: str, monthly_income: int) -> bool:
         return monthly_income <= val / 2 / 12
     return True
  
+REGION_KEYWORDS = [
+    "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
+    "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주",
+    "수원", "성남", "고양", "용인", "안산", "안양", "남양주", "화성",
+    "금정구", "곡성군", "청주", "천안", "전주", "포항", "창원",
+]
+
 def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_income: bool) -> bool:
-    """정책 자격 조건 체크. 통과하면 True."""
     age_min = policy.get("age_min")
     age_max = policy.get("age_max")
 
@@ -351,6 +357,14 @@ def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_inco
         return False
     if age_max is not None and user_age > age_max:
         return False
+
+    # 지역 조건 있는 정책 제외
+    org = policy.get("org") or ""
+    policy_name = policy.get("policy_name") or ""
+    combined = f"{org} {policy_name}"
+    if any(region in combined for region in REGION_KEYWORDS):
+        return False
+
     if not skip_income:
         income_condition = policy.get("income_condition") or ""
         if not _income_condition_met(income_condition, user_income):
