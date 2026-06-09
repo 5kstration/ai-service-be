@@ -68,7 +68,7 @@ stage('LLM Judge') {
                 export EVAL_WAIT_SEC=30
                 export EVAL_CALL_INTERVAL=20
 
-                python llm_benchmark.py
+                python3 llm_benchmark.py
             '''
         }
     }
