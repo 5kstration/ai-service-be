@@ -15,8 +15,12 @@ DB_URL = URL.create(
     query      = {"sslmode": "require"},
 )
 
-engine = create_engine(DB_URL, echo=False)
-
+engine = create_engine(
+    DB_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class Base(DeclarativeBase):
