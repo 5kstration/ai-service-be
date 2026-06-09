@@ -108,11 +108,6 @@ class Neo4jClient:
         return self.fetch_triples(policy_keys, label_hint="Policy")
 
     def fetch_candidates_by_categories(self, categories: list[str], limit: int = 10) -> dict[str, list[str]]:
-        """
-        카테고리(유저의 주요 지출 분야) 기반으로 Neo4j에서 후보 상품 키들을 검색.
-        - Policy: IN_CATEGORY 관계 사용
-        - Card/Insurance: top_benefit 속성에 키워드 포함 여부 확인
-        """
         if not categories or not self._is_ready():
             return {"cards": [], "insurances": [], "policies": []}
 
@@ -123,10 +118,26 @@ class Neo4jClient:
         LIMIT $limit
         """
 
+        cypher_policy_similar = """
+        MATCH (p:Policy)-[:IN_CATEGORY]->(c:Category)
+        WHERE c.name IN $categories
+        MATCH (p)-[:SIMILAR_TO]->(similar:Policy)
+        RETURN DISTINCT similar.key AS key
+        LIMIT $limit
+        """
+
         cypher_card = """
         MATCH (n:Card)
         WHERE any(kw IN $categories WHERE n.top_benefit CONTAINS kw)
         RETURN DISTINCT n.key AS key
+        LIMIT $limit
+        """
+
+        cypher_card_similar = """
+        MATCH (n:Card)
+        WHERE any(kw IN $categories WHERE n.top_benefit CONTAINS kw)
+        MATCH (n)-[:SIMILAR_TO]->(similar:Card)
+        RETURN DISTINCT similar.key AS key
         LIMIT $limit
         """
 
@@ -137,22 +148,32 @@ class Neo4jClient:
         LIMIT $limit
         """
 
+        cypher_insurance_similar = """
+        MATCH (n:Insurance)
+        WHERE any(kw IN $categories WHERE n.top_benefit CONTAINS kw)
+        MATCH (n)-[:SIMILAR_TO]->(similar:Insurance)
+        RETURN DISTINCT similar.key AS key
+        LIMIT $limit
+        """
+
         try:
             assert self._driver is not None
             with self._driver.session(database=settings.NEO4J_DATABASE) as session:
                 policies = [r["key"] for r in session.run(cypher_policy, categories=categories, limit=limit)]
+                policies += [r["key"] for r in session.run(cypher_policy_similar, categories=categories, limit=limit)]
                 cards = [r["key"] for r in session.run(cypher_card, categories=categories, limit=limit)]
+                cards += [r["key"] for r in session.run(cypher_card_similar, categories=categories, limit=limit)]
                 insurances = [r["key"] for r in session.run(cypher_insurance, categories=categories, limit=limit)]
-                
+                insurances += [r["key"] for r in session.run(cypher_insurance_similar, categories=categories, limit=limit)]
+
                 return {
-                    "policies": policies,
-                    "cards": cards,
-                    "insurances": insurances
+                    "policies": list(set(policies)),
+                    "cards": list(set(cards)),
+                    "insurances": list(set(insurances)),
                 }
         except Exception as e:
             logger.warning(f"[Neo4jClient] fetch_candidates_by_categories 실패 - error={e}")
             return {"cards": [], "insurances": [], "policies": []}
-
     def fetch_candidates_by_cf(self, categories: list[str], limit: int = 10) -> dict[str, list[str]]:
         """
         Collaborative Filtering (협업 필터링) 검색
