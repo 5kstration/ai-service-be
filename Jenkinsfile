@@ -54,13 +54,18 @@ stage('LLM Judge') {
             accessKeyVariable: 'AWS_ACCESS_KEY_ID',
             secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
         ]]) {
-        sh '''
-            aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-            
-            AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
-            kubectl cp llm_benchmark.py moneylog/$AI_POD:/tmp/llm_benchmark.py
-            kubectl exec -n moneylog $AI_POD -- python3 /tmp/llm_benchmark.py
-        '''
+            sh '''
+                python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
+                aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+                AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
+                kubectl cp llm_benchmark.py moneylog/$AI_POD:/tmp/llm_benchmark.py
+                kubectl exec -n moneylog $AI_POD \
+                    --env EVAL_BASE_URL=http://localhost:8000 \
+                    --env EVAL_WAIT_SEC=60 \
+                    --env EVAL_CALL_INTERVAL=25 \
+                    -- python3 /tmp/llm_benchmark.py
+            '''
         }
     }
 }
