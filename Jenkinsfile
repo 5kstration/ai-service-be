@@ -55,7 +55,7 @@ stage('LLM Judge') {
             secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
         ]]) {
             sh '''
-                pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
+                python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
 
                 aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
 
