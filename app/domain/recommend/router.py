@@ -13,7 +13,7 @@ from app.domain.recommend.service import RecommendService
 from app.core.config.database import get_db
 from app.core.common.response import CommonResponse
 from app.core.middleware.auth import get_current_user
-
+from fastapi import BackgroundTasks
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="", tags=["Recommend"])
@@ -26,15 +26,9 @@ router = APIRouter(prefix="", tags=["Recommend"])
     "/policies",
     response_model=CommonResponse[PolicyListResponse],
     summary="청년 정책 추천 목록",
-    description="""
-    AI 추천 청년정책 목록을 반환합니다.
-    D-day 오름차순 정렬.
-
-    **예외 케이스**
-    - 추천 데이터 없음 → 빈 리스트 반환
-    """,
 )
 def get_policies(
+    background_tasks: BackgroundTasks,
     page: int = Query(default=0, ge=0, description="페이지 번호"),
     size: int = Query(default=10, ge=1, le=50, description="페이지당 항목 수"),
     db: Session = Depends(get_db),
@@ -43,7 +37,17 @@ def get_policies(
     logger.info("[RecommendRouter] GET /policies")
     service = RecommendService(db)
     data = service.get_policies(current_user, page, size)
+
+    last_recommended_at = service.repo.find_last_recommended_at(current_user)
+    if last_recommended_at:
+        update_count = service.repo.count_summary_updates_since(current_user, last_recommended_at)
+        if update_count >= 5:
+            background_tasks.add_task(_run_pipeline, current_user)
+    else:
+        background_tasks.add_task(_run_pipeline, current_user)
+
     return CommonResponse.of(data)
+
 
 
 # =============================================
@@ -148,3 +152,13 @@ def get_bookmarks(
     service = RecommendService(db)
     data = service.get_bookmarks(current_user)  # get_bookmarked_policies → get_bookmarks
     return CommonResponse.of(data)
+
+
+
+async def _run_pipeline(user_id: str):
+    try:
+        from app.domain.recommend_ai.graph import run_recommend_pipeline
+        await run_recommend_pipeline(user_id)
+        logger.info(f"[RecommendRouter] 백그라운드 파이프라인 완료 - user_id={user_id}")
+    except Exception as e:
+        logger.error(f"[RecommendRouter] 백그라운드 파이프라인 실패 - user_id={user_id}, error={e}")
