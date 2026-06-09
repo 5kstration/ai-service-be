@@ -45,7 +45,34 @@ pipeline {
             }
         }
     }
+stage('LLM Judge') {
+    steps {
+        echo '🤖 [LLM Judge] 추천 품질 평가 중...'
+        withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: "${AWS_CRED_ID}",
+            accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+            secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+        ]]) {
+            sh '''
+                pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
 
+                aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+                export DB_HOST=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_HOST}' | base64 -d)
+                export DB_NAME=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_NAME}' | base64 -d)
+                export DB_USER=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_USER}' | base64 -d)
+                export DB_PASSWORD=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)
+                export ANTHROPIC_API_KEY=$(kubectl get secret -n moneylog ai-service-secret -o jsonpath='{.data.ANTHROPIC_API_KEY}' | base64 -d)
+                export EVAL_BASE_URL=http://ai-service.moneylog.svc.cluster.local:8000
+                export EVAL_WAIT_SEC=30
+                export EVAL_CALL_INTERVAL=20
+
+                python llm_benchmark.py
+            '''
+        }
+    }
+}
         stage('AWS ECR Authentication') {
             steps {
                 echo 'Logging in to ECR...'
