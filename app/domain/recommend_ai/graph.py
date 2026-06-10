@@ -108,6 +108,7 @@ async def run_recommend_pipeline(
         "card_candidates":        [],
         "insurance_candidates":   [],
         "policy_candidates":      [],
+        "insurance_risk_summary": None,  # 추가
         "filtered_policies":      [],
         "policy_graph_triples":   [],
         "card_graph_triples":     [],
@@ -117,7 +118,6 @@ async def run_recommend_pipeline(
         "recommended_insurances": [],
         "recommended_policies":   [],
         "error":                  None,
-        # Ablation 플래그
         "disable_neo4j":         disable_neo4j,
         "disable_rerank":        disable_rerank,
         "disable_income_filter": disable_income_filter,

@@ -10,7 +10,7 @@ class RecommendState(TypedDict):
     user_age:           Optional[int]
     user_sex:           Optional[str]
     user_income:        Optional[int]
-    monthly_summary:    list   # [{"category": "식비", "amount": 156000}, ...]
+    monthly_summary:    list
 
     # 2. 임베딩 노드
     user_embedding: Optional[list]
@@ -19,29 +19,28 @@ class RecommendState(TypedDict):
     card_candidates:      list
     insurance_candidates: list
     policy_candidates:    list
+    insurance_risk_summary: Optional[str]  # 보험 위험도 분석 요약
 
     # 4. 필터 노드
     filtered_policies: list
 
     # 4-1. Graph 확장 (Neo4j)
-    policy_graph_triples: list  # [{"s":..., "p":..., "o":..., ...}, ...]
+    policy_graph_triples: list
     card_graph_triples: list
     insurance_graph_triples: list
 
     # 5. conflict 노드
-    conflict_info: dict  # {policy_id: [conflict_policy_ids]}
+    conflict_info: dict
 
     # 6. LLM 추천 노드
-    recommended_cards:      list  # [{"product_id": ..., "reason": ...}]
+    recommended_cards:      list
     recommended_insurances: list
     recommended_policies:   list
 
     # 에러 추적
     error: Optional[str]
 
-    # =============================================
-    # Ablation Study 플래그 (헤더로 주입, 기본값 False)
-    # =============================================
-    disable_neo4j:          Optional[bool]   # True: graph_expand_node skip
-    disable_rerank:         Optional[bool]   # True: rerank_node skip
-    disable_income_filter:  Optional[bool]   # True: 소득조건 필터 skip
+    # Ablation Study 플래그
+    disable_neo4j:          Optional[bool]
+    disable_rerank:         Optional[bool]
+    disable_income_filter:  Optional[bool]
