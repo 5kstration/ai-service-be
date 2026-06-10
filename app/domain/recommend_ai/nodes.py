@@ -241,11 +241,29 @@ def vector_search_node(state: RecommendState) -> dict:
         cards      = db.query(CardProduct).filter(CardProduct.key.in_(card_ids)).all()
         insurances = db.query(InsuranceProduct).filter(InsuranceProduct.key.in_(insurance_ids)).all()
         policies   = db.query(PolicyProduct).filter(PolicyProduct.key.in_(policy_ids)).all()
- 
-        logger.info(
-            f"[VectorSearchNode] 완료 - "
-            f"cards={len(cards)}, insurances={len(insurances)}, policies={len(policies)}"
-        )
+
+        # ── 보험 타입 필터링 (소비 패턴 기반) ──
+        INSURANCE_TYPE_MAP = {
+            "의료":   ["실손", "건강", "의료비", "입원"],
+            "운동":   ["실손", "건강", "스포츠"],
+            "여행":   ["여행", "해외"],
+            "자동차": ["운전자", "자동차"],
+            "주유":   ["운전자", "자동차"],
+        }
+        top_cats = [s["category"] for s in sorted_summary[:3]]
+        insurance_keywords = []
+        for cat in top_cats:
+            insurance_keywords.extend(INSURANCE_TYPE_MAP.get(cat, []))
+
+        if insurance_keywords:
+            filtered = [
+                i for i in insurances
+                if any(kw in (i.insurance_name or "") or kw in (i.top_benefit or "")
+                       for kw in insurance_keywords)
+            ]
+            if len(filtered) >= 2:
+                insurances = filtered
+                logger.info(f"[VectorSearchNode] 보험 타입 필터링 - {len(filtered)}개")
         return {
             "card_candidates":      [{"key": c.key, "company": c.company, "card_name": c.card_name, "top_benefit": c.top_benefit, "benefits": c.benefits, "apply_url": c.apply_url, "accent_color": c.accent_color} for c in cards],
             "insurance_candidates": [{"key": i.key, "insurer": i.insurer, "insurance_name": i.insurance_name, "top_benefit": i.top_benefit, "benefits": i.benefits, "apply_url": i.apply_url, "accent_color": i.accent_color} for i in insurances],
@@ -556,9 +574,13 @@ def llm_recommend_node(state: RecommendState) -> dict:
    - 확인되지 않은 수치(할인율, 지원금액)를 임의로 만들지 말 것 → 상품 정보에 없으면 "~혜택이 있어요"로만 표현
    - 2~3문장으로 작성
    - "~할 것 같습니다" 금지 → "~할 수 있어요", "~에 딱 맞아요" 사용
-3. 보험은 유저 나이와 성별, 소비 패턴에서 유추한 라이프스타일 기반으로 추천
-   - 같은 종류 보험(예: 실손보험 2개) 중복 추천 금지
-   - 같은 회사 상품 2개 이상 추천 금지
+3. 보험은 유저 소비 패턴에서 라이프스타일을 파악한 뒤 추천할 것:
+   - 의료/운동 지출 있음 → 실손보험, 건강보험 우선
+   - 여행 지출 있음 → 여행보험 우선
+   - 자동차/주유 지출 있음 → 운전자보험 우선
+   - 여행 지출이 0원이면 여행보험 추천 금지
+   - 자동차/주유 지출이 0원이면 운전자보험 추천 금지
+   - 반드시 후보 보험 목록의 top_benefit 내용만 사용하여 추천 사유 작성
 4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
    - 후보 정책 목록이 비어있지 않으면 반드시 1개 이상 추천할 것
    - 조건이 애매하면 유저에게 유리하게 해석하여 추천
