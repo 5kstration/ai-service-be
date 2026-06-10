@@ -274,12 +274,19 @@ def vector_search_node(state: RecommendState) -> dict:
                 reverse=True
             )[:3]
 
+            # 위험도 요약 텍스트 생성 (소비 카테고리 명시)  
             risk_lines = []
             for kw in top_keywords:
                 score = round(insurance_type_scores[kw], 2)
-                risk_lines.append(f"  - {kw} 관련 보험 (위험도 점수: {score})")
+                # 이 키워드에 기여한 카테고리 찾기
+                related_cats = [
+                    f"{s['category']}({s['amount']:,}원)"
+                    for s in sorted_summary
+                    if kw in CATEGORY_INSURANCE_SCORE.get(s["category"], {})
+                ]
+                related_text = ", ".join(related_cats) if related_cats else "일반 생활"
+                risk_lines.append(f"  - {kw} 관련 보험 (위험도 점수: {score}, 근거 지출: {related_text})")
             insurance_risk_summary = "소비 패턴 기반 보험 위험도 분석:\n" + "\n".join(risk_lines)
-
             logger.info(f"[VectorSearchNode] 보험 위험도: { {k: round(insurance_type_scores[k], 2) for k in top_keywords} }")
 
             filtered = [
@@ -401,7 +408,6 @@ def _income_condition_met(condition: str, monthly_income: int) -> bool:
         return monthly_income <= val / 2 / 12
     return True
  
-_REGION_PATTERN = _re.compile(r'[가-힣]+(시|군|구|동|읍|면)\s')
 
 def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_income: bool) -> bool:
     age_min = policy.get("age_min")
@@ -410,11 +416,6 @@ def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_inco
     if age_min is not None and user_age < age_min:
         return False
     if age_max is not None and user_age > age_max:
-        return False
-
-    # 지역 조건 있는 정책 제외
-    policy_name = policy.get("policy_name") or ""
-    if _REGION_PATTERN.search(policy_name):
         return False
 
     if not skip_income:
@@ -625,8 +626,10 @@ def llm_recommend_node(state: RecommendState) -> dict:
 3. 보험 추천 규칙:
    - 위험도 분석 결과를 반드시 참고하여 추천할 것
    - 위험도 점수가 높은 보험 타입을 우선 추천
+   - 추천 사유에 반드시 "근거 지출" 카테고리와 금액을 언급할 것
+     예: "이번 달 여행을 1,000,000원을 지출하셨는데, 여행 중 사고에 대비한 상해보험을 추천드려요"
+   - 근거 지출이 없는 보험 타입 추천 금지
    - 분석 결과에 없는 보험 타입(여행 지출 없으면 여행보험 등) 추천 금지
-   - 추천 사유에 반드시 유저의 소비 카테고리와 위험도 연결 설명 포함
 4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
    - 후보 정책 목록이 비어있지 않으면 반드시 1개 이상 추천할 것
    - 조건이 애매하면 유저에게 유리하게 해석하여 추천
