@@ -67,11 +67,23 @@ def profile_node(state: RecommendState) -> dict:
             MonthlySummary.year   == today.year,
             MonthlySummary.month  == today.month,
         ).all()
+        CATEGORY_KO_MAP = {
+            "FOOD": "식비", "TRANSPORT": "교통", "SHOPPING": "쇼핑",
+            "CAFE": "카페", "HOUSING": "주거", "MEDICAL": "의료",
+            "TRAVEL": "여행", "CAR": "자동차", "CULTURE": "문화",
+            "EDUCATION": "교육", "BUSINESS": "사업", "INVEST": "투자",
+            "GAS": "주유", "TELECOM": "통신", "SPORT": "운동",
+            "HOBBY": "여가", "OTHER": "기타",
+        }
 
         monthly_summary = [
-            {"category": s.category, "amount": s.amount or 0}
+            {
+                "category": CATEGORY_KO_MAP.get(s.category.upper(), s.category),
+                "amount": s.amount or 0
+            }
             for s in summaries
         ]
+
 
         logger.info(f"[ProfileNode] 완료 - user_id={user_id}, age={age}")
         return {
