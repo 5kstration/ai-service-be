@@ -240,7 +240,7 @@ def vector_search_node(state: RecommendState) -> dict:
             "자동차": {"운전자": 3, "자동차": 3},
             "주유":   {"운전자": 3, "자동차": 2},
             "교통":   {"상해": 2, "운전자": 1},
-            "식비":   {"건강": 1},
+            "식비": {"건강": 1, "실손": 1},
             "여가":   {"상해": 2, "여행": 1},
         }
 
@@ -316,30 +316,26 @@ def rerank_node(state: RecommendState) -> dict:
         f"{s['category']} {s['amount']:,}원"
         for s in state["monthly_summary"]
     ])
-    query = (
+
+    card_query = (
         f"나이 {state['user_age']}세 {state['user_sex']}. "
-        f"월급 {state['user_income']:,}원. "
-        f"이번 달 지출: {summary_text}"
+        f"이번 달 지출: {summary_text}. "
+        f"지출 카테고리에 맞는 할인 혜택 카드"
     )
-    def rerank_candidates(candidates: list, text_fn, query: str) -> list:
-        if not candidates:
-            return []
-        texts   = [text_fn(c) for c in candidates]
-        indices = reranker_client.rerank(query, texts, top_n=RERANK_TOP_N)
-        return [candidates[i] for i in indices]
-    def card_text(c: dict) -> str:
-        return f"{c.get('company','')} {c.get('card_name','')}. {c.get('top_benefit','')}. 혜택: {c.get('benefits','')}"
- 
-    def insurance_text(i: dict) -> str:
-        return f"{i.get('insurer','')} {i.get('insurance_name','')}. 핵심 혜택: {i.get('top_benefit','')}. 혜택 상세: {i.get('benefits','')}"
- 
-    def policy_text(p: dict) -> str:
-        return f"{p.get('policy_name','')}. 카테고리: {p.get('category','')}. 태그: {p.get('tags','')}"
- 
-    reranked_cards      = rerank_candidates(state["card_candidates"],      card_text)
-    reranked_insurances = rerank_candidates(state["insurance_candidates"],  insurance_text)
-    reranked_policies   = rerank_candidates(state["policy_candidates"],     policy_text)
- 
+    insurance_query = (
+        f"나이 {state['user_age']}세 {state['user_sex']}. "
+        f"이번 달 지출: {summary_text}. "
+        f"소비 패턴 기반 보험 보장"
+    )
+    policy_query = (
+        f"나이 {state['user_age']}세 {state['user_sex']}. "
+        f"월 소득 {state['user_income']:,}원. "
+        f"나이와 소득 조건에 맞는 청년 지원 정책"
+    )
+
+    reranked_cards      = rerank_candidates(state["card_candidates"],      card_text,      card_query)
+    reranked_insurances = rerank_candidates(state["insurance_candidates"],  insurance_text, insurance_query)
+    reranked_policies   = rerank_candidates(state["policy_candidates"],     policy_text,    policy_query)
     logger.info(
         f"[RerankNode] 완료 - "
         f"cards: {len(state['card_candidates'])}→{len(reranked_cards)}, "
