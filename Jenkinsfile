@@ -107,9 +107,29 @@ pipeline {
             }
         }
 
-        stage('LLM Judge') {
-            steps {
-                echo '🤖 [LLM Judge] 추천 품질 평가 중...'
+    stage('LLM Judge') {
+        steps {
+            echo '🤖 [LLM Judge] 추천 품질 평가 중...'
+            withCredentials([[
+                $class: 'AmazonWebServicesCredentialsBinding',
+                credentialsId: "${AWS_CRED_ID}",
+                accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+            ]]) {
+                sh '''
+                    python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
+                    aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+                    AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
+                    kubectl cp llm_benchmark.py $AI_POD:/tmp/llm_benchmark.py --namespace moneylog
+                    kubectl exec -n moneylog $AI_POD -- \
+                        sh -c 'EVAL_BASE_URL=http://localhost:8000 EVAL_WAIT_SEC=60 EVAL_CALL_INTERVAL=25 python3 /tmp/llm_benchmark.py'
+                '''
+            }
+        }
+        post {
+            failure {
+                echo '❌ LLM Judge 실패 - 이전 버전으로 롤백합니다...'
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: "${AWS_CRED_ID}",
@@ -117,31 +137,10 @@ pipeline {
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
                     sh '''
-                        python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
                         aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-
-                        AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
-                        kubectl cp llm_benchmark.py moneylog/$AI_POD:/tmp/llm_benchmark.py
-                        kubectl exec -n moneylog $AI_POD -- \
-                            sh -c 'EVAL_BASE_URL=http://localhost:8000 EVAL_WAIT_SEC=60 EVAL_CALL_INTERVAL=25 python3 /tmp/llm_benchmark.py'
+                        kubectl rollout undo -n moneylog deployment/ai-service
+                        kubectl rollout status -n moneylog deployment/ai-service --timeout=180s
                     '''
-                }
-            }
-            post {
-                failure {
-                    echo '❌ LLM Judge 실패 - 이전 버전으로 롤백합니다...'
-                    withCredentials([[
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${AWS_CRED_ID}",
-                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ]]) {
-                        sh '''
-                            aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-                            kubectl rollout undo -n moneylog deployment/ai-service
-                            kubectl rollout status -n moneylog deployment/ai-service --timeout=180s
-                        '''
-                    }
                 }
             }
         }
