@@ -89,6 +89,30 @@ TEST_USERS = [
             {"category": "기타",  "amount": 20000,  "ratio": 3.3},
         ],
     },
+    {
+        "user_id": "01HXGT000000000004",
+        "name":    "취업준비_자기계발_중심",
+        "profile": {"birth": date(2001, 3, 5), "sex": "여자", "monthly_income": 1500000},
+        "monthly_summary": [
+            {"category": "교육",  "amount": 150000, "ratio": 40.0},
+            {"category": "식비",  "amount": 100000, "ratio": 26.7},
+            {"category": "교통",  "amount": 60000,  "ratio": 16.0},
+            {"category": "통신",  "amount": 40000,  "ratio": 10.7},
+            {"category": "기타",  "amount": 25000,  "ratio": 6.6},
+        ],
+    },
+    {
+        "user_id": "01HXGT000000000005",
+        "name":    "고소득_투자_중심",
+        "profile": {"birth": date(1995, 11, 20), "sex": "남자", "monthly_income": 5500000},
+        "monthly_summary": [
+            {"category": "투자",  "amount": 300000, "ratio": 38.0},
+            {"category": "식비",  "amount": 200000, "ratio": 25.3},
+            {"category": "쇼핑",  "amount": 150000, "ratio": 19.0},
+            {"category": "여가",  "amount": 80000,  "ratio": 10.1},
+            {"category": "기타",  "amount": 60000,  "ratio": 7.6},
+        ],
+    },
 ]
 
 
