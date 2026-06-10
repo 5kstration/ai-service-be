@@ -116,15 +116,24 @@ pipeline {
                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 ]]) {
-                    sh '''
-                        python3 -m pip install anthropic httpx psycopg2-binary python-dotenv --break-system-packages -q
-                        aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-
-                        AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
-                        kubectl cp llm_benchmark.py $AI_POD:/tmp/llm_benchmark.py --namespace moneylog
-                        kubectl exec -n moneylog $AI_POD -- \
-                            sh -c 'EVAL_BASE_URL=http://localhost:8000 EVAL_WAIT_SEC=60 EVAL_CALL_INTERVAL=25 python3 /tmp/llm_benchmark.py'
-                    '''
+                sh '''
+                    aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+                    AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
+                    
+                    # 서버 준비 대기 (최대 60초)
+                    for i in $(seq 1 12); do
+                        if kubectl exec -n moneylog $AI_POD -- sh -c "ss -tlnp | grep 8000" 2>/dev/null; then
+                            echo "서버 준비 완료"
+                            break
+                        fi
+                        echo "대기 중... ($i/12)"
+                        sleep 5
+                    done
+                    
+                    kubectl cp llm_benchmark.py $AI_POD:/tmp/llm_benchmark.py --namespace moneylog
+                    kubectl exec -n moneylog $AI_POD -- \
+                        sh -c 'EVAL_BASE_URL=http://localhost:8000 EVAL_WAIT_SEC=60 EVAL_CALL_INTERVAL=25 python3 /tmp/llm_benchmark.py'
+                '''
                 }
             }
             post {
