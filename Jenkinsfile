@@ -121,16 +121,19 @@ pipeline {
                     kubectl rollout status deployment/ai-service -n moneylog --timeout=120s
                     
                     AI_POD=$(kubectl get pod -n moneylog -l app=ai-service --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+                    echo "사용할 Pod: $AI_POD"
                     
                     for i in $(seq 1 24); do
-                        if kubectl exec -n moneylog $AI_POD -- python3 -c "import httpx; httpx.get('http://localhost:8000/health', timeout=3)" 2>/dev/null; then
-                            echo "서버 준비 완료"
+                        STATUS=$(kubectl exec -n moneylog $AI_POD -- wget -qO- http://localhost:8000/health 2>/dev/null || echo "")
+                        if [ -n "$STATUS" ]; then
+                            echo "서버 준비 완료: $STATUS"
                             break
                         fi
                         echo "서버 대기 중... ($i/24)"
                         sleep 5
                     done
                     
+                    AI_POD=$(kubectl get pod -n moneylog -l app=ai-service --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
                     kubectl cp llm_benchmark.py $AI_POD:/tmp/llm_benchmark.py --namespace moneylog
                     kubectl exec -n moneylog $AI_POD -- \
                         sh -c 'EVAL_BASE_URL=http://localhost:8000 EVAL_WAIT_SEC=60 EVAL_CALL_INTERVAL=25 python3 /tmp/llm_benchmark.py'
@@ -161,6 +164,7 @@ pipeline {
         always {
             echo 'Cleaning local Docker image cache...'
             sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
+            sh "docker builder prune -af || true"
         }
         success {
             echo 'EKS deployment succeeded.'
