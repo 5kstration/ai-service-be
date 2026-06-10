@@ -118,17 +118,22 @@ pipeline {
                 ]]) {
                 sh '''
                     aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-                    AI_POD=$(kubectl get pod -n moneylog -l app=ai-service -o jsonpath='{.items[0].metadata.name}')
                     
-                    # 서버 준비 대기 (최대 60초)
-                    for i in $(seq 1 12); do
-                        if kubectl exec -n moneylog $AI_POD -- sh -c "ss -tlnp | grep 8000" 2>/dev/null; then
-                            echo "서버 준비 완료"
-                            break
+                    # 새 pod이 Running 상태로 완전히 뜰 때까지 대기
+                    for i in $(seq 1 24); do
+                        AI_POD=$(kubectl get pod -n moneylog -l app=ai-service --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+                        if [ -n "$AI_POD" ]; then
+                            STATUS=$(kubectl get pod -n moneylog $AI_POD -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+                            if [ "$STATUS" = "true" ]; then
+                                echo "Pod 준비 완료: $AI_POD"
+                                break
+                            fi
                         fi
-                        echo "대기 중... ($i/12)"
+                        echo "Pod 대기 중... ($i/24)"
                         sleep 5
                     done
+                    
+                    sleep 10
                     
                     kubectl cp llm_benchmark.py $AI_POD:/tmp/llm_benchmark.py --namespace moneylog
                     kubectl exec -n moneylog $AI_POD -- \
