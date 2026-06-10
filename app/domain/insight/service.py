@@ -240,11 +240,10 @@ class InsightService:
             achievement_rate = int(total_expense / goal.goal_expense * 100)
 
             if remain_budge < 0:
-                # 예산 초과
                 return InsightCardItem(
                     insight_type = "goal_status",
-                    title        = "이번 달 목표 초과",
-                    description  = f"목표를 {abs(remain_budge):,}원 초과했어요. 다음 달엔 더 잘 할 수 있어요!",
+                    title        = "이번 달 목표 못 지켰어요",
+                    description  = f"이번 달 {abs(remain_budge):,}원을 초과했어요. 설정 목표: {goal.goal_expense:,}원, 실제 지출: {total_expense:,}원",
                     icon_type    = "Target",
                     accent_color = "#F43F5E",
                     metric_value = f"{achievement_rate}% 달성",

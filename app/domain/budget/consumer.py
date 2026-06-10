@@ -18,14 +18,23 @@ async def handle_budget_event(body: str):
     except json.JSONDecodeError:
         logger.exception(f"[BudgetConsumer] JSON 파싱 실패 - body={repr(body[:100])}")
         raise
+    CATEGORY_KO_MAP = {
+        "FOOD": "식비", "TRANSPORT": "교통", "SHOPPING": "쇼핑",
+        "CAFE": "카페", "HOUSING": "주거", "MEDICAL": "의료",
+        "TRAVEL": "여행", "CAR": "자동차", "CULTURE": "문화",
+        "EDUCATION": "교육", "BUSINESS": "사업", "INVEST": "투자",
+        "GAS": "주유", "TELECOM": "통신", "SPORT": "운동",
+        "OTHER": "기타",
+    }
 
+    # handle_budget_event 안에서 category 변환
+    category = CATEGORY_KO_MAP.get(data.get("category", "").upper(), data.get("category", "기타"))
     user_id    = data.get("userId")
     year       = data.get("year")
     month      = data.get("month")
     week       = data.get("weekOfMonth")
     start_date = data.get("startDate")
     end_date   = data.get("endDate")
-    category   = data.get("category")
     amount     = int(data.get("amount", 0))
     event_type = data.get("eventType")
 
