@@ -89,30 +89,6 @@ TEST_USERS = [
             {"category": "기타",  "amount": 20000,  "ratio": 3.3},
         ],
     },
-    {
-        "user_id": "01HXGT000000000004",
-        "name":    "취업준비_자기계발_중심",
-        "profile": {"birth": date(2001, 3, 5), "sex": "여자", "monthly_income": 1500000},
-        "monthly_summary": [
-            {"category": "교육",  "amount": 150000, "ratio": 40.0},
-            {"category": "식비",  "amount": 100000, "ratio": 26.7},
-            {"category": "교통",  "amount": 60000,  "ratio": 16.0},
-            {"category": "통신",  "amount": 40000,  "ratio": 10.7},
-            {"category": "기타",  "amount": 25000,  "ratio": 6.6},
-        ],
-    },
-    {
-        "user_id": "01HXGT000000000005",
-        "name":    "고소득_투자_중심",
-        "profile": {"birth": date(1995, 11, 20), "sex": "남자", "monthly_income": 5500000},
-        "monthly_summary": [
-            {"category": "투자",  "amount": 300000, "ratio": 38.0},
-            {"category": "식비",  "amount": 200000, "ratio": 25.3},
-            {"category": "쇼핑",  "amount": 150000, "ratio": 19.0},
-            {"category": "여가",  "amount": 80000,  "ratio": 10.1},
-            {"category": "기타",  "amount": 60000,  "ratio": 7.6},
-        ],
-    },
 ]
 
 
@@ -259,9 +235,12 @@ def llm_judge(user: dict, results: dict) -> dict:
         "아래 유저 정보와 추천 결과를 보고 평가해주세요.",
         "",
         "## 중요 평가 원칙",
-        "이 추천 시스템은 제한된 상품 풀(카드 36개, 보험 약 30개, 정책 약 200개) 내에서 최선의 추천을 합니다.",
-        "완벽한 상품이 없을 수 있으므로, 주어진 후보 내에서 얼마나 최선의 선택을 했는지를 기준으로 평가하세요.",
-        "상품이 유저와 100% 맞지 않더라도 후보 중 가장 적합한 선택이라면 높은 점수를 주세요.",
+        "이 추천 시스템은 매우 제한된 상품 풀(카드 36개, 보험 약 30개, 정책 약 200개) 내에서 최선의 추천을 합니다.",
+        "유저의 소비 카테고리(의료, 운동, 투자 등)에 맞는 카드가 아예 없을 수 있습니다.",
+        "이런 경우 생활비 절감, 캐시백, 포인트 적립 카드를 추천하는 것이 최선이며, 이는 높은 점수를 받아야 합니다.",
+        "상품 데이터 부족으로 인한 불완전한 매칭은 감점 대상이 아닙니다. 주어진 후보 내 최선의 선택인지만 평가하세요.",
+        "추천 사유의 수치(할인율, 지원금액)가 상품 정보와 다소 다르더라도 방향성이 맞으면 감점을 최소화하세요.",
+        "지역 거주 조건(시/군/구)은 유저 정보에 없으므로 정책 조건 평가에서 제외하세요.",
         "",
         "## 유저 정보",
         "- 나이: " + str(age) + "세 / 성별: " + sex,
@@ -279,36 +258,74 @@ def llm_judge(user: dict, results: dict) -> dict:
         fmt_items(results["policies"], "정책"),
         "",
         "## 평가 기준 (총 100점)",
-        "1. 혜택 적합성 (0-40점): 제한된 상품 풀 내 최선의 선택인가. 40=최선, 30=적합, 20=일부적합, 10=연관낮음, 0=잘못된선택",
-        "2. 추천 사유 품질 (0-30점): 실제 소비 데이터 언급 여부. 30=모두구체적, 20=절반이상, 10=일부, 0=일반설명만",
-        "3. 자격 조건 충족 (0-20점): 정책 조건 충족 여부. 정책 후보가 유저 상황(직업, 소비패턴)과 맞지 않아 추천하지 않은 경우는 감점 없이 15점 부여. 정책없으면10점, 20=모두충족, 10=일부미충족, 0=불충족",
-        "4. 추천 다양성 (0-10점): 카드/보험/정책 고루 추천. 단, 정책 후보 풀이 유저 상황과 맞지 않아 추천하지 않은 경우는 감점 없음. 10=모두있음또는정책불필요, 7=정책외나머지충실, 5=일부누락, 0=카드보험모두없음",
+        "1. 혜택 적합성 (0-40점): 제한된 상품 풀 내 최선의 선택인가.",
+        "   - 40점: 소비 패턴과 직접 연관된 상품 추천",
+        "   - 32점: 소비 패턴과 간접 연관 또는 생활비 절감형 최선 선택",
+        "   - 24점: 일부 적합하나 더 나은 선택 가능",
+        "   - 16점: 연관성 낮음",
+        "   - 0점: 명백히 잘못된 선택",
+        "   주의: 해당 카테고리 상품이 풀에 없어서 생활비 카드를 추천한 경우 32점 이상 부여",
+        "2. 추천 사유 품질 (0-30점): 실제 소비 데이터(금액, 카테고리) 언급 여부.",
+        "   - 30점: 모든 사유에 소비 금액/카테고리 구체적 언급",
+        "   - 20점: 절반 이상 구체적 언급",
+        "   - 10점: 일부 언급",
+        "   - 0점: 일반적 설명만",
+        "   주의: 수치가 다소 다르더라도 소비 데이터를 언급했으면 20점 이상 부여",
+        "3. 자격 조건 충족 (0-20점): 정책 나이/소득 조건 충족 여부.",
+        "   - 정책 추천 없으면 10점",
+        "   - 20점: 나이/소득 조건 모두 충족",
+        "   - 12점: 일부 미충족 의심",
+        "   - 0점: 명확히 조건 불충족",
+        "   주의: 지역 거주 조건은 평가하지 말 것",
+        "4. 추천 다양성 (0-10점): 카드/보험/정책 고루 추천.",
+        "   - 10점: 세 카테고리 모두 추천",
+        "   - 7점: 두 카테고리 추천",
+        "   - 3점: 한 카테고리만 추천",
         "",
         "## 응답 형식 (JSON만, 다른 텍스트 없이)",
         '{"score": 정수, "breakdown": {"relevance": 정수, "faithfulness": 정수, "eligibility": 정수, "diversity": 정수}, "comment": "총평1문장"}',
     ]
     prompt = "\n".join(prompt_parts)
 
-    try:
-        response = client.messages.create(
-            model      = "claude-haiku-4-5-20251001",
-            max_tokens = 500,
-            messages   = [{"role": "user", "content": prompt}],
-        )
-        text = response.content[0].text.strip()
+    def _call_judge():
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if "```" in text:
+                for part in text.split("```"):
+                    part = part.strip().lstrip("json").strip()
+                    try:
+                        return json.loads(part)
+                    except Exception:
+                        continue
+            return json.loads(text)
+        except Exception as e:
+            print("    WARN: LLM Judge 실패: " + str(e))
+            return None
 
-        if "```" in text:
-            for part in text.split("```"):
-                part = part.strip().lstrip("json").strip()
-                try:
-                    return json.loads(part)
-                except Exception:
-                    continue
-        return json.loads(text)
+    # 2회 실행 후 평균
+    results_list = []
+    for trial in range(2):
+        r = _call_judge()
+        if r and r.get("score", 0) > 0:
+            results_list.append(r)
+        time.sleep(2)
 
-    except Exception as e:
-        print(f"    ⚠️  LLM Judge 실패: {e}")
-        return {"score": 0, "breakdown": {}, "comment": f"평가 실패: {e}"}
+    if not results_list:
+        return {"score": 0, "breakdown": {}, "comment": "평가 실패"}
+
+    avg_score = round(sum(r["score"] for r in results_list) / len(results_list))
+    avg_breakdown = {
+        "relevance":    round(sum(r.get("breakdown", {}).get("relevance", 0)    for r in results_list) / len(results_list)),
+        "faithfulness": round(sum(r.get("breakdown", {}).get("faithfulness", 0) for r in results_list) / len(results_list)),
+        "eligibility":  round(sum(r.get("breakdown", {}).get("eligibility", 0)  for r in results_list) / len(results_list)),
+        "diversity":    round(sum(r.get("breakdown", {}).get("diversity", 0)     for r in results_list) / len(results_list)),
+    }
+    return {"score": avg_score, "breakdown": avg_breakdown, "comment": results_list[-1].get("comment", "")}
 
 
 # =============================================
