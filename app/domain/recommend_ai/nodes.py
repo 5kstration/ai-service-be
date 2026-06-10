@@ -175,19 +175,17 @@ def vector_search_node(state: RecommendState) -> dict:
     """pgvector cosine similarity → 후보 상품 검색."""
     if state.get("error"):
         return {}
- 
+
     embedding = state["user_embedding"]
     vdb: Session = VectorSessionLocal()
     db: Session  = SessionLocal()
- 
+
     try:
         embedding_str = f"[{','.join(map(str, embedding))}]"
- 
-        # 1. Neo4j Graph Retrieval (Top 2 카테고리 기반 10개씩)
 
-        # 수정
         sorted_summary = sorted(state.get("monthly_summary", []), key=lambda x: x.get("amount", 0), reverse=True)
 
+        # ── Neo4j Graph Retrieval ──
         CATEGORY_MAP = {
             "식비":   [_CAT_LIFE, _CAT_FINANCE],
             "교통":   [_CAT_LIFE, "교통지원"],
@@ -206,73 +204,95 @@ def vector_search_node(state: RecommendState) -> dict:
             "운동":   [_CAT_CULTURE, _CAT_HEALTH],
         }
 
-        raw_cats   = [s["category"] for s in sorted_summary[:2]]
-        mapped     = []
+        raw_cats = [s["category"] for s in sorted_summary[:2]]
+        mapped = []
         for cat in raw_cats:
             mapped.extend(CATEGORY_MAP.get(cat, [cat]))
-        top_categories = list(dict.fromkeys(mapped))  # 순서 유지하면서 중복 제거
+        top_categories = list(dict.fromkeys(mapped))
 
         graph_candidates = neo4j_client.fetch_candidates_by_categories(top_categories, limit=10)
         cf_candidates    = neo4j_client.fetch_candidates_by_cf(top_categories, limit=10)
 
-
-
-
-        # 3. Vector Search (임베딩 유사도 기반 30개씩)
-        def search(product_type: str) -> list[str]:
+        # ── Vector Search ──
+        def search(product_type: str) -> list:
             result = vdb.execute(text("""
                 SELECT product_id
                 FROM product_embedding
                 WHERE product_type = :ptype
                 ORDER BY embedding <=> CAST(:emb AS vector)
                 LIMIT :limit
-            """), {
-                "ptype": product_type,
-                "emb":   embedding_str,
-                "limit": 30, # 기존처럼 벡터 검색 30개 유지 (Recall 손실 방지)
-            })
+            """), {"ptype": product_type, "emb": embedding_str, "limit": 30})
             return [row[0] for row in result.fetchall()]
- 
-        # 세 가지 결과를 중복 제거하여 합침 (최대 50개)
-        card_ids      = list(set(search("card") + graph_candidates.get("cards", []) + cf_candidates.get("cards", [])))
+
+        card_ids      = list(set(search("card")      + graph_candidates.get("cards", [])      + cf_candidates.get("cards", [])))
         insurance_ids = list(set(search("insurance") + graph_candidates.get("insurances", []) + cf_candidates.get("insurances", [])))
-        policy_ids    = list(set(search("policy") + graph_candidates.get("policies", []) + cf_candidates.get("policies", [])))
- 
+        policy_ids    = list(set(search("policy")    + graph_candidates.get("policies", [])   + cf_candidates.get("policies", [])))
+
         cards      = db.query(CardProduct).filter(CardProduct.key.in_(card_ids)).all()
         insurances = db.query(InsuranceProduct).filter(InsuranceProduct.key.in_(insurance_ids)).all()
         policies   = db.query(PolicyProduct).filter(PolicyProduct.key.in_(policy_ids)).all()
 
-        # ── 보험 타입 필터링 (소비 패턴 기반) ──
-        INSURANCE_TYPE_MAP = {
-            "의료":   ["실손", "건강", "의료비", "입원"],
-            "운동":   ["실손", "건강", "스포츠"],
-            "여행":   ["여행", "해외"],
-            "자동차": ["운전자", "자동차"],
-            "주유":   ["운전자", "자동차"],
+        # ── 보험 위험도 점수 기반 필터링 ──
+        CATEGORY_INSURANCE_SCORE = {
+            "의료":   {"실손": 3, "건강": 3, "입원": 2},
+            "운동":   {"상해": 3, "건강": 2},
+            "여행":   {"여행": 3, "상해": 2, "해외": 3},
+            "자동차": {"운전자": 3, "자동차": 3},
+            "주유":   {"운전자": 3, "자동차": 2},
+            "교통":   {"상해": 2, "운전자": 1},
+            "식비":   {"건강": 1},
+            "여가":   {"상해": 2, "여행": 1},
         }
-        top_cats = [s["category"] for s in sorted_summary[:3]]
-        insurance_keywords = []
-        for cat in top_cats:
-            insurance_keywords.extend(INSURANCE_TYPE_MAP.get(cat, []))
 
-        if insurance_keywords:
+        total_amount = sum(s["amount"] for s in sorted_summary) or 1
+        insurance_type_scores: dict = {}
+        for s in sorted_summary:
+            cat    = s["category"]
+            weight = s["amount"] / total_amount
+            for ins_kw, base_score in CATEGORY_INSURANCE_SCORE.get(cat, {}).items():
+                insurance_type_scores[ins_kw] = (
+                    insurance_type_scores.get(ins_kw, 0) + base_score * weight
+                )
+
+        insurance_risk_summary = ""
+        if insurance_type_scores:
+            top_keywords = sorted(
+                insurance_type_scores,
+                key=lambda k: insurance_type_scores[k],
+                reverse=True
+            )[:3]
+
+            risk_lines = []
+            for kw in top_keywords:
+                score = round(insurance_type_scores[kw], 2)
+                risk_lines.append(f"  - {kw} 관련 보험 (위험도 점수: {score})")
+            insurance_risk_summary = "소비 패턴 기반 보험 위험도 분석:\n" + "\n".join(risk_lines)
+
+            logger.info(f"[VectorSearchNode] 보험 위험도: { {k: round(insurance_type_scores[k], 2) for k in top_keywords} }")
+
             filtered = [
                 i for i in insurances
                 if any(kw in (i.insurance_name or "") or kw in (i.top_benefit or "")
-                       for kw in insurance_keywords)
+                       for kw in top_keywords)
             ]
-            if len(filtered) >= 2:
+            if len(filtered) >= 1:
                 insurances = filtered
-                logger.info(f"[VectorSearchNode] 보험 타입 필터링 - {len(filtered)}개")
+                logger.info(f"[VectorSearchNode] 보험 타입 필터링 - {len(filtered)}개 ({top_keywords})")
+
+        logger.info(
+            f"[VectorSearchNode] 완료 - "
+            f"cards={len(cards)}, insurances={len(insurances)}, policies={len(policies)}"
+        )
+
         return {
-            "card_candidates":      [{"key": c.key, "company": c.company, "card_name": c.card_name, "top_benefit": c.top_benefit, "benefits": c.benefits, "apply_url": c.apply_url, "accent_color": c.accent_color} for c in cards],
-            "insurance_candidates": [{"key": i.key, "insurer": i.insurer, "insurance_name": i.insurance_name, "top_benefit": i.top_benefit, "benefits": i.benefits, "apply_url": i.apply_url, "accent_color": i.accent_color} for i in insurances],
-            "policy_candidates":    [{"key": p.key, "policy_name": p.policy_name, "org": p.org, "category": p.category, "category_color": p.category_color, "deadline": p.deadline, "dday": p.dday, "tags": p.tags, "age_min": p.age_min, "age_max": p.age_max, "income_condition": p.income_condition, "conflict_policy_ids": p.conflict_policy_ids} for p in policies],
+            "card_candidates":        [{"key": c.key, "company": c.company, "card_name": c.card_name, "top_benefit": c.top_benefit, "benefits": c.benefits, "apply_url": c.apply_url, "accent_color": c.accent_color} for c in cards],
+            "insurance_candidates":   [{"key": i.key, "insurer": i.insurer, "insurance_name": i.insurance_name, "top_benefit": i.top_benefit, "benefits": i.benefits, "apply_url": i.apply_url, "accent_color": i.accent_color} for i in insurances],
+            "policy_candidates":      [{"key": p.key, "policy_name": p.policy_name, "org": p.org, "category": p.category, "category_color": p.category_color, "deadline": p.deadline, "dday": p.dday, "tags": p.tags, "age_min": p.age_min, "age_max": p.age_max, "income_condition": p.income_condition, "conflict_policy_ids": p.conflict_policy_ids} for p in policies],
+            "insurance_risk_summary": insurance_risk_summary,
         }
     finally:
         vdb.close()
         db.close()
- 
  
 # =============================================
 # 3-1. 리랭크 노드
@@ -576,13 +596,14 @@ def llm_recommend_node(state: RecommendState) -> dict:
    - 확인되지 않은 수치(할인율, 지원금액)를 임의로 만들지 말 것 → 상품 정보에 없으면 "~혜택이 있어요"로만 표현
    - 2~3문장으로 작성
    - "~할 것 같습니다" 금지 → "~할 수 있어요", "~에 딱 맞아요" 사용
-3. 보험은 유저 소비 패턴에서 라이프스타일을 파악한 뒤 추천할 것:
-   - 의료/운동 지출 있음 → 실손보험, 건강보험 우선
-   - 여행 지출 있음 → 여행보험 우선
-   - 자동차/주유 지출 있음 → 운전자보험 우선
-   - 여행 지출이 0원이면 여행보험 추천 금지
-   - 자동차/주유 지출이 0원이면 운전자보험 추천 금지
-   - 반드시 후보 보험 목록의 top_benefit 내용만 사용하여 추천 사유 작성
+## 보험 추천 근거 (소비 패턴 기반 위험도 분석)
+{state.get('insurance_risk_summary') or '분석 없음'}
+
+3. 보험 추천 규칙:
+   - 위험도 분석 결과를 반드시 참고하여 추천할 것
+   - 위험도 점수가 높은 보험 타입을 우선 추천
+   - 분석 결과에 없는 보험 타입(여행 지출 없으면 여행보험 등) 추천 금지
+   - 추천 사유에 반드시 유저의 소비 카테고리와 위험도 연결 설명 포함
 4. 정책은 나이/소득 조건에 맞는 것 중 가장 혜택이 큰 것 우선
    - 후보 정책 목록이 비어있지 않으면 반드시 1개 이상 추천할 것
    - 조건이 애매하면 유저에게 유리하게 해석하여 추천
