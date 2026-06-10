@@ -408,6 +408,7 @@ def _income_condition_met(condition: str, monthly_income: int) -> bool:
         return monthly_income <= val / 2 / 12
     return True
  
+_REGION_PATTERN = _re.compile(r'[가-힣]+(시|군|구|동|읍|면)\s')
 
 def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_income: bool) -> bool:
     age_min = policy.get("age_min")
@@ -416,6 +417,11 @@ def _is_policy_eligible(policy: dict, user_age: int, user_income: int, skip_inco
     if age_min is not None and user_age < age_min:
         return False
     if age_max is not None and user_age > age_max:
+        return False
+
+    # 지역 조건 있는 정책 제외
+    policy_name = policy.get("policy_name") or ""
+    if _REGION_PATTERN.search(policy_name):
         return False
 
     if not skip_income:
