@@ -332,7 +332,22 @@ def rerank_node(state: RecommendState) -> dict:
         f"월 소득 {state['user_income']:,}원. "
         f"나이와 소득 조건에 맞는 청년 지원 정책"
     )
+    def rerank_candidates(candidates: list, text_fn, query: str) -> list:
+        if not candidates:
+            return []
+        texts   = [text_fn(c) for c in candidates]
+        indices = reranker_client.rerank(query, texts, top_n=RERANK_TOP_N)
+        return [candidates[i] for i in indices]
 
+    def card_text(c: dict) -> str:
+        return f"{c.get('company','')} {c.get('card_name','')}. {c.get('top_benefit','')}. 혜택: {c.get('benefits','')}"
+
+    def insurance_text(i: dict) -> str:
+        return f"{i.get('insurer','')} {i.get('insurance_name','')}. 핵심 혜택: {i.get('top_benefit','')}. 혜택 상세: {i.get('benefits','')}"
+
+    def policy_text(p: dict) -> str:
+        return f"{p.get('policy_name','')}. 카테고리: {p.get('category','')}. 태그: {p.get('tags','')}"
+    
     reranked_cards      = rerank_candidates(state["card_candidates"],      card_text,      card_query)
     reranked_insurances = rerank_candidates(state["insurance_candidates"],  insurance_text, insurance_query)
     reranked_policies   = rerank_candidates(state["policy_candidates"],     policy_text,    policy_query)
