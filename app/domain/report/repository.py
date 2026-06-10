@@ -195,13 +195,13 @@ class ReportRepository:
                     MonthlySummary.year    == today.year,
                     MonthlySummary.month   == today.month,
                 )
+                .order_by(MonthlySummary.amount.desc())
                 .all()
             )
         except SQLAlchemyError as e:
             self.db.rollback()
             logger.error(f"[ReportRepository] 월간 요약 조회 실패 - error={e}")
             raise BusinessException(ErrorCode.DB_ERROR)
-
     # =============================================
     # 또래 비교
     # =============================================
