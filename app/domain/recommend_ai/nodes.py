@@ -436,10 +436,14 @@ def filter_node(state: RecommendState) -> dict:
         return {}
 
     user_age    = state.get("user_age") or 0
-    user_income = state.get("user_income") or 0
+    user_income = state.get("user_income")
+    skip_income = state.get("disable_income_filter", False) or (user_income is None)
     skip_income = state.get("disable_income_filter", False)
 
-    filtered  = [p for p in state["policy_candidates"] if _is_policy_eligible(p, user_age, user_income, skip_income)]
+    filtered = [
+        p for p in state["policy_candidates"]
+        if _is_policy_eligible(p, user_age, user_income or 0, skip_income)
+    ]
     rejected  = len(state["policy_candidates"]) - len(filtered)
 
     logger.info(
