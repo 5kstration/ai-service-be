@@ -25,7 +25,7 @@ langchain-core==0.3.86
 langchain-aws==0.2.35
 
 # HTTP Client
-httpx==0.26.0
+httpx==0.25.2
 # Scheduler
 APScheduler==3.11.2
 
