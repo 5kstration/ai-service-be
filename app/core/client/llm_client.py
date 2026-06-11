@@ -29,6 +29,7 @@ class LLMClient:
         target_expense: int,
         achievement_rate: int,
         weekly_expenses: list,
+        monthly_summary: list = None,
     ) -> tuple[str, str]:
         """
         AI 리포트용 summary_message, saving_tip 생성.
@@ -52,6 +53,7 @@ class LLMClient:
             target_expense   = target_expense,
             achievement_rate = achievement_rate,
             weekly_expenses  = weekly_expenses,
+            monthly_summary  = monthly_summary,
         )
         raw = self._call(user_id=user_id, prompt=prompt, max_tokens=500)
         return self._parse_report_response(raw, user_id)
@@ -62,12 +64,20 @@ class LLMClient:
         target_expense: int,
         achievement_rate: int,
         weekly_expenses: list,
+        monthly_summary: list = None,  # 추가
     ) -> str:
-        """리포트 생성용 프롬프트 구성."""
         weekly_text = "\n".join([
             f"  {w.week}주차: {w.amount:,}원 ({w.start_date}~{w.end_date})"
             for w in weekly_expenses
         ]) or "  데이터 없음"
+
+        # 추가
+        category_text = ""
+        if monthly_summary:
+            category_text = "\n[카테고리별 지출]\n" + "\n".join([
+                f"  {s.category}: {s.amount:,}원 ({int(s.ratio or 0)}%)"
+                for s in monthly_summary
+            ])
 
         return f"""
 당신은 청년 맞춤형 금융 관리 앱의 AI 어시스턴트입니다.
@@ -80,6 +90,7 @@ class LLMClient:
 
 [주차별 지출]
 {weekly_text}
+{category_text}
 
 [응답 규칙]
 - 친근하고 응원하는 톤으로 작성하세요.
@@ -94,8 +105,8 @@ class LLMClient:
 
 아래 JSON 형식으로만 응답해주세요.
 {{
-  "summary_message": "전체 소비 패턴에 대한 친근한 요약 (2~3문장, 이모지 없이)",
-  "saving_tip": "현재 상황에서 실천 가능한 절약 팁 1가지 (실현 가능성이 있어야 함)(1문장)"
+    "summary_message": "이번 달 소비 패턴을 분석하여 잘하고 있는 점과 개선할 점을 포함해 친근하게 2~3문장으로 작성. 단순 "이번달 nn%절약했어요"와같은 단문 금지. 카테고리별 지출 비중과 목표 달성 여부를 구체적으로 언급. 이모지 없이",
+    "saving_tip": "가장 지출이 많은 카테고리를 기반으로 당장 실천 가능한 구체적인 절약 팁 1가지 (1~2문장)"
 }}
 """
 
