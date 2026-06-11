@@ -10,6 +10,11 @@ spec:
   selector:
     matchLabels:
       app: ai-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   template:
     metadata:
       labels:
