@@ -101,7 +101,7 @@ pipeline {
 
                         kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - --validate=false
                         kubectl apply -f k8s/ --validate=false
-                        kubectl -n "$K8S_NAMESPACE" rollout status deployment/ai-service --timeout=180s
+                        kubectl -n "$K8S_NAMESPACE" rollout status deployment/ai-service --timeout=300s
                     '''
                 }
             }
@@ -152,7 +152,7 @@ pipeline {
                         sh '''
                             aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
                             kubectl rollout undo -n moneylog deployment/ai-service
-                            kubectl rollout status -n moneylog deployment/ai-service --timeout=180s
+                            kubectl rollout status -n moneylog deployment/ai-service --timeout=300s
                         '''
                     }
                 }
