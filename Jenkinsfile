@@ -165,6 +165,7 @@ pipeline {
             echo 'Cleaning local Docker image cache...'
             sh "docker rmi ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} || true"
             sh "docker builder prune -af || true"
+            sh "docker system prune -af --volumes || true"
         }
         success {
             echo 'EKS deployment succeeded.'
