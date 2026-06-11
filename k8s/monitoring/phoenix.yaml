@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phoenix
+  namespace: monitoring
+  labels:
+    app: phoenix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: phoenix
+  template:
+    metadata:
+      labels:
+        app: phoenix
+    spec:
+      containers:
+        - name: phoenix
+          image: arizephoenix/phoenix:latest
+          ports:
+            - containerPort: 6006   # Phoenix UI
+            - containerPort: 4317   # OTLP gRPC (trace 수신)
+            - containerPort: 4318   # OTLP HTTP (trace 수신)
+          env:
+            - name: PHOENIX_WORKING_DIR
+              value: /phoenix
+            - name: PHOENIX_SQL_DATABASE_URL
+              value: "postgresql://phoenix:fisa1234@10.2.0.23:5432/phoenix"
+            - name: PHOENIX_TELEMETRY_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          volumeMounts:
+            - name: phoenix-storage
+              mountPath: /phoenix
+      volumes:
+        - name: phoenix-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phoenix
+  namespace: monitoring
+spec:
+  type: NodePort
+  selector:
+    app: phoenix
+  ports:
+    - name: ui
+      port: 6006
+      targetPort: 6006
+      nodePort: 30086   # Phoenix UI → 10.2.0.21:30086
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      nodePort: 30317   # EKS ai-service → trace 전송 (gRPC)
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      nodePort: 30318   # EKS ai-service → trace 전송 (HTTP)
