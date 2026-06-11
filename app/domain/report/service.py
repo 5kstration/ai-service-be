@@ -73,7 +73,6 @@ class ReportService:
         profile_required = (
             profile is None
             or profile.monthly_income is None
-            or profile.monthly_income <= 0
         )
 
         # 프로필 없으면 goal 체크 의미 없음

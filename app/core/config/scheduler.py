@@ -12,11 +12,14 @@ def setup_scheduler():
     """배치 스케줄 등록."""
 
     # 매일 새벽 3시 — 상품 동기화 + 임베딩 + 전체 유저 재추천
+    # UTC 기준 18시 = KST 03시
+    from pytz import timezone
+
     scheduler.add_job(
         _daily_batch,
-        CronTrigger(hour=3, minute=0),
-        id      = "daily_recommend_batch",
-        replace_existing = True,
+        CronTrigger(hour=3, minute=0, timezone=timezone('Asia/Seoul')),
+        id="daily_recommend_batch",
+        replace_existing=True,
     )
     scheduler.start()
     logger.info("[Scheduler] 스케줄러 시작 - 매일 새벽 3시 배치 등록")
