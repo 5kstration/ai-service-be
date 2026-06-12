@@ -21,7 +21,7 @@ from app.domain.report.schema import (
 )
 from app.domain.report.entity import AiReport, Goal
 from app.core.config.redis import get_redis_client
-from app.core.config.sqs import publish_profile_update
+from app.core.config.nats import publish_profile_update
 from app.core.error.exception import BusinessException
 from app.core.error.error_code import ErrorCode
 from app.core.utils.tsid import TSID
@@ -124,13 +124,13 @@ class ReportService:
     # 프로필 설정 (온보딩 스킵 유저 대상)
     # =============================================
 
-    def setup_profile(self, user_id: str, req: "ProfileSetupRequest") -> "ProfileSetupResponse":
+    def setup_profile(self, user_id: str, req: "ProfileSetupRequest", background_tasks: "BackgroundTasks") -> "ProfileSetupResponse":
         """
         보내온 필드만 업데이트. None으로 보낸 필드는 기존 저장값 유지.
-        SQS 발행도 이번 요청에서 실제 변경된 필드 + 기존 저장값을 합쳐서 전체 스냅샷 발행.
+        NATS 발행도 이번 요청에서 실제 변경된 필드 + 기존 저장값을 합쳐서 전체 스냅샷 발행.
 
         예: birth만 보내면 → birth만 업데이트, monthly_income/sex는 기존값 유지.
-            SQS에는 {userId, monthlyIncome: 기존값, birth: 새값, sex: 기존값} 으로 발행.
+            NATS에는 {userId, monthlyIncome: 기존값, birth: 새값, sex: 기존값} 으로 발행.
         """
         from app.domain.report.schema import ProfileSetupResponse
 
@@ -155,19 +155,24 @@ class ReportService:
             sex            = req.sex,
         )
 
-        # SQS 발행: AUTH가 받는 형식 그대로 (전체 스냅샷 = 업데이트 후 최종 저장값)
-        sqs_payload = {
+        # NATS 발행: AUTH가 받는 형식 그대로 (전체 스냅샷 = 업데이트 후 최종 저장값)
+        nats_payload = {
             "userId":        user_id,
             "monthlyIncome": profile.monthly_income,
             "birth":         profile.birth.isoformat() + "T00:00:00" if profile.birth else None,
             "sex":           profile.sex,
         }
-        published = publish_profile_update(sqs_payload)
-        if not published:
-            logger.warning(
-                f"[ReportService] 프로필 SQS 발행 실패 - user_id={user_id}. "
-                f"프로필 저장은 완료. AUTH 서비스 데이터 불일치 가능."
-            )
+        
+        async def _run_publish():
+            published = await publish_profile_update(nats_payload)
+            if not published:
+                logger.warning(
+                    f"[ReportService] 프로필 NATS 발행 실패 - user_id={user_id}. "
+                    f"프로필 저장은 완료. AUTH 서비스 데이터 불일치 가능."
+                )
+
+        import asyncio
+        background_tasks.add_task(lambda: asyncio.run(_run_publish()))
 
         goal = self.repo.find_goal_current_month(user_id)
         goal_required = (goal is None)
