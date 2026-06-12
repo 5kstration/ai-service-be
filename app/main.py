@@ -7,7 +7,7 @@ from app.domain.report.router import router as report_router
 from app.domain.recommend.router import router as recommend_router
 from app.domain.insight.router import router as insight_router
 from app.domain.recommend_ai.router import router as recommend_ai_router
-from app.core.config.sqs import start_consumers
+from app.core.config.nats import start_consumers
 from app.core.config.scheduler import setup_scheduler
 from fastapi.middleware.cors import CORSMiddleware
 

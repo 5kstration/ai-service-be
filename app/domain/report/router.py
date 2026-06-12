@@ -100,6 +100,8 @@ def get_profile_missing_fields(
 # 프로필 설정 (온보딩 스킵 유저 대상)
 # =============================================
 
+from fastapi import APIRouter, Depends, BackgroundTasks
+
 @router.post(
     "/profile",
     response_model=CommonResponse[ProfileSetupResponse],
@@ -111,7 +113,7 @@ def get_profile_missing_fields(
     - `GET /report/profile`로 비어있는 필드 확인 후 해당 필드만 전송
     - 예: 생년월일만 없으면 `{"birth": "1997-03-15"}` 만 전송
 
-    **SQS 발행 (AUTH 수신 형식과 동일)**
+    **NATS 발행 (AUTH 수신 형식과 동일)**
     변경된 필드 + 기존 저장값을 합친 **전체 스냅샷**으로 발행합니다.
     ```json
     {
@@ -121,7 +123,7 @@ def get_profile_missing_fields(
       "sex":           "남자"
     }
     ```
-    SQS 발행 실패 시 서비스 중단 없이 로깅만 처리합니다 (DB 저장은 이미 완료).
+    NATS 발행 실패 시 서비스 중단 없이 로깅만 처리합니다 (DB 저장은 이미 완료).
 
     **응답의 `updated_fields`**: 이번 요청에서 실제 업데이트된 필드 목록.
     **응답의 `goal_required`**: true면 목표 설정 화면으로 이동.
@@ -135,12 +137,13 @@ def get_profile_missing_fields(
 )
 def setup_profile(
     req: ProfileSetupRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
     logger.info(f"[ReportRouter] POST /api/ai/report/profile - user_id={current_user}")
     service = ReportService(db)
-    data = service.setup_profile(current_user, req)
+    data = service.setup_profile(current_user, req, background_tasks)
     return CommonResponse.of(data, message="프로필 정보가 저장되었습니다.")
 
 
