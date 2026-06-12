@@ -19,6 +19,8 @@ spec:
     metadata:
       labels:
         app: ai-service
+      annotations:
+        sidecar.istio.io/proxyCPU: "10m"
     spec:
       serviceAccountName: ai-service-sa
       containers:
@@ -31,7 +33,7 @@ spec:
                 name: ai-service-secret
           resources:
             requests:
-              cpu: "200m"
+              cpu: "20m"
               memory: "1Gi"
             limits:
               cpu: "1000m"
