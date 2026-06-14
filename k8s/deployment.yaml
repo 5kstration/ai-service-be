@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: ai-service
   namespace: moneylog
@@ -7,14 +7,16 @@ metadata:
     app: ai-service
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: ai-service
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 0
+    canary:
+      steps:
+      - setWeight: 20
+      - pause:
+          duration: 30s
+      - setWeight: 50
+      - pause:
+          duration: 30s
+  selector:
   template:
     metadata:
       labels:
@@ -28,9 +30,37 @@ spec:
           image: 525089404962.dkr.ecr.ap-northeast-2.amazonaws.com/ai-service-be:IMAGE_TAG_PLACEHOLDER
           ports:
             - containerPort: 8000
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30  # 최대 150초 대기 (Python/FastAPI 초기화 시간 고려)
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 5
           envFrom:
             - secretRef:
                 name: ai-service-secret
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: ai-service
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.moneylog.svc.cluster.local:4317
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.environment=eks,k8s.namespace.name=moneylog
           resources:
             requests:
               cpu: "20m"

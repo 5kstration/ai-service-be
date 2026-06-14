@@ -122,7 +122,7 @@ curl -sLO https://github.com/argoproj/argo-rollouts/releases/latest/download/kub
                     aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
 curl -sLO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
                     chmod +x ./kubectl-argo-rollouts-linux-amd64
-                    ./kubectl-argo-rollouts-linux-amd64 -n moneylog status ai-service --timeout=120s
+                    ./kubectl-argo-rollouts-linux-amd64 -n moneylog status ai-service --timeout=360s
                     
                     AI_POD=$(kubectl get pod -n moneylog -l app=ai-service --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
                     echo "사용할 Pod: $AI_POD"
