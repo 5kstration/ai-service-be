@@ -17,6 +17,8 @@ spec:
       - pause:
           duration: 30s
   selector:
+    matchLabels:
+      app: ai-service
   template:
     metadata:
       labels:
