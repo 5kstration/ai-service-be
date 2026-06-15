@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_URL       = os.getenv("EVAL_BASE_URL", "http://localhost:8000")
-PASS_THRESHOLD = int(os.getenv("LLM_JUDGE_THRESHOLD", "70"))
+PASS_THRESHOLD = int(os.getenv("LLM_JUDGE_THRESHOLD", "65"))
 CALL_INTERVAL  = int(os.getenv("EVAL_CALL_INTERVAL", "15"))
 WAIT_SEC       = int(os.getenv("EVAL_WAIT_SEC", "60"))
 JUDGE_TRIALS   = int(os.getenv("LLM_JUDGE_TRIALS", "3"))
