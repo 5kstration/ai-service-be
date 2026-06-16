@@ -19,7 +19,7 @@ async def get_nats_client():
     if _nats_client is None:
         try:
             nc = NatsClient()
-            nats_url = settings.NATS_URL if hasattr(settings, 'NATS_URL') and settings.NATS_URL else "nats://nats-leaf:4222"
+            nats_url = settings.NATS_URL if hasattr(settings, 'NATS_URL') and settings.NATS_URL else "nats://k8s_leaf:leaf_password@10.0.2.65:4222"
             await nc.connect(nats_url)
             _nats_client = nc
             _js = nc.jetstream()
@@ -59,7 +59,7 @@ async def start_consumers():
                 logger.error(f"[NATS] Onboarding 메시지 처리 실패 - error={e}")
                 await msg.nak()
 
-        sub1 = await js.subscribe(subject, queue="ai-service-onboarding-queue", stream=stream_name, durable="ai-service-onboarding-consumer", cb=onboarding_cb)
+        sub1 = await js.subscribe(subject, stream=stream_name, durable="ai-service-onboarding-consumer-v2", cb=onboarding_cb)
         _consumer_tasks.append(sub1)
     except Exception as e:
         logger.error(f"[NATS] Onboarding consumer 시작 실패 - error={e}")
@@ -80,7 +80,7 @@ async def start_consumers():
                 logger.error(f"[NATS] Budget 메시지 처리 실패 - error={e}")
                 await msg.nak()
 
-        sub2 = await js.subscribe(subject, queue="ai-service-budget-queue", stream=stream_name, durable="ai-service-budget-consumer", cb=budget_cb)
+        sub2 = await js.subscribe(subject, stream=stream_name, durable="ai-service-budget-consumer-v2", cb=budget_cb)
         _consumer_tasks.append(sub2)
     except Exception as e:
         logger.error(f"[NATS] Budget consumer 시작 실패 - error={e}")
