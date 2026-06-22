@@ -1,0 +1,145 @@
+/opt/anaconda3/lib/python3.11/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.11.8, pytest-8.3.3, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/nyongwan/5kstration-github/ai-service-be
+plugins: asyncio-0.24.0, cov-5.0.0, langsmith-0.7.22, mock-3.14.0, anyio-4.2.0
+asyncio: mode=Mode.STRICT, default_loop_scope=None
+collecting ... collected 1 item
+
+tests/domain/report/test_router.py::test_get_report_status PASSED        [100%]
+
+=============================== warnings summary ===============================
+app/domain/report/schema.py:10
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:10: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ReportResponse(BaseModel):
+
+app/domain/report/schema.py:33
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:33: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PeerCategoryItem(BaseModel):
+
+app/domain/report/schema.py:45
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:45: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PeersComparisonResponse(BaseModel):
+
+app/domain/report/schema.py:68
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProfileMissingFieldsResponse(BaseModel):
+
+app/domain/report/schema.py:84
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:84: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProfileSetupRequest(BaseModel):
+
+app/domain/report/schema.py:93
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:93: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProfileSetupResponse(BaseModel):
+
+app/domain/report/schema.py:109
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:109: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GoalSetupRequest(BaseModel):
+
+app/domain/report/schema.py:116
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/report/schema.py:116: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GoalSetupResponse(BaseModel):
+
+app/core/config/settings.py:6
+  /Users/nyongwan/5kstration-github/ai-service-be/app/core/config/settings.py:6: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Settings(BaseSettings):
+
+app/domain/recommend/schema.py:17
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/recommend/schema.py:17: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PolicyListItem(BaseModel):
+
+app/domain/recommend/schema.py:43
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/recommend/schema.py:43: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PolicyDetailResponse(BaseModel):
+
+app/domain/recommend/schema.py:72
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/recommend/schema.py:72: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InsuranceItem(BaseModel):
+
+app/domain/recommend/schema.py:97
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/recommend/schema.py:97: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CardItem(BaseModel):
+
+app/domain/recommend/schema.py:139
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/recommend/schema.py:139: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BookmarkPolicyItem(BaseModel):
+
+app/domain/recommend/schema.py:154
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/recommend/schema.py:154: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BookmarkInsuranceItem(BaseModel):
+
+app/domain/recommend/schema.py:168
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/recommend/schema.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BookmarkCardItem(BaseModel):
+
+app/domain/insight/schema.py:12
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:12: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class WeeklyExpenseItem(BaseModel):
+
+app/domain/insight/schema.py:24
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CategoryExpenseItem(BaseModel):
+
+app/domain/insight/schema.py:35
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:35: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InsightCardItem(BaseModel):
+
+app/domain/insight/schema.py:80
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProfileMissingFieldsResponse(BaseModel):
+
+app/domain/insight/schema.py:100
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:100: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProfileSetupRequest(BaseModel):
+
+app/domain/insight/schema.py:109
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:109: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProfileSetupResponse(BaseModel):
+
+app/domain/insight/schema.py:126
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:126: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GoalSetupRequest(BaseModel):
+
+app/domain/insight/schema.py:133
+  /Users/nyongwan/5kstration-github/ai-service-be/app/domain/insight/schema.py:133: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GoalSetupResponse(BaseModel):
+
+../../../../opt/anaconda3/lib/python3.11/site-packages/langgraph/cache/base/__init__.py:8
+  /opt/anaconda3/lib/python3.11/site-packages/langgraph/cache/base/__init__.py:8: LangChainPendingDeprecationWarning: The default value of `allowed_objects` will change in a future version. Pass an explicit value (e.g., allowed_objects='messages' or allowed_objects='core') to suppress this warning.
+    from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+
+app/main.py:67
+  /Users/nyongwan/5kstration-github/ai-service-be/app/main.py:67: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+../../../../opt/anaconda3/lib/python3.11/site-packages/fastapi/applications.py:4495
+../../../../opt/anaconda3/lib/python3.11/site-packages/fastapi/applications.py:4495
+  /opt/anaconda3/lib/python3.11/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+app/main.py:78
+  /Users/nyongwan/5kstration-github/ai-service-be/app/main.py:78: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 1 passed, 29 warnings in 0.01s ========================
